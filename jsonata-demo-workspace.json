@@ -1,0 +1,246 @@
+{
+  "nodes": [
+    {
+      "id": "folder-demo-root",
+      "type": "folder",
+      "name": "JSONata Demo Workspace",
+      "parentId": null,
+      "color": "#e8b84b",
+      "open": true,
+      "expr": "",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "folder-getting-started",
+      "type": "folder",
+      "name": "Getting Started",
+      "parentId": "folder-demo-root",
+      "color": "#e8b84b",
+      "open": false,
+      "expr": "",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-basic-selection",
+      "type": "script",
+      "name": "Basic Selection",
+      "parentId": "folder-getting-started",
+      "open": true,
+      "expr": "Account.Order.Product.{\n  \"name\": `Product Name`,\n  \"price\": Price,\n  \"quantity\": Quantity\n}",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-simple-summary",
+      "type": "script",
+      "name": "Simple Summary",
+      "parentId": "folder-getting-started",
+      "open": true,
+      "expr": "{\n  \"account\": Account.`Account Name`,\n  \"orders\": $count(Account.Order),\n  \"products\": $count(Account.Order.Product),\n  \"totalRevenue\": $sum(Account.Order.Product.(Price * Quantity))\n}",
+      "input": "",
+      "order": 1
+    },
+    {
+      "id": "folder-arrays-mapping",
+      "type": "folder",
+      "name": "Arrays & Mapping",
+      "parentId": "folder-demo-root",
+      "color": "#4db887",
+      "open": false,
+      "expr": "",
+      "input": "",
+      "order": 1
+    },
+    {
+      "id": "script-map-and-filter",
+      "type": "script",
+      "name": "Map And Filter",
+      "parentId": "folder-arrays-mapping",
+      "open": true,
+      "expr": "Account.Order.Product[Price >= $minPrice].{\n  \"sku\": SKU,\n  \"displayName\": $slug(`Product Name`),\n  \"gross\": $round(Price * Quantity, 2),\n  \"tags\": Tags\n}",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-sort-and-topn",
+      "type": "script",
+      "name": "Sort And Top-N",
+      "parentId": "folder-arrays-mapping",
+      "open": true,
+      "expr": "$sort(Account.Order.Product, function($l, $r) { ($l.Price * $l.Quantity) > ($r.Price * $r.Quantity) })[0..2].{\n  \"product\": `Product Name`,\n  \"lineValue\": $round(Price * Quantity, 2)\n}",
+      "input": "",
+      "order": 1
+    },
+    {
+      "id": "folder-objects-grouping",
+      "type": "folder",
+      "name": "Objects & Grouping",
+      "parentId": "folder-demo-root",
+      "color": "#5b9cf6",
+      "open": false,
+      "expr": "",
+      "input": "",
+      "order": 2
+    },
+    {
+      "id": "script-group-by-category",
+      "type": "script",
+      "name": "Group By Category",
+      "parentId": "folder-objects-grouping",
+      "open": true,
+      "expr": "$reduce(\n  $distinct(Account.Order.Product.Category),\n  function($acc, $category) {\n    $merge([\n      $acc,\n      {\n        ($category): {\n          \"count\": $count(Account.Order.Product[Category = $category]),\n          \"revenue\": $round($sum(Account.Order.Product[Category = $category].(Price * Quantity)), 2)\n        }\n      }\n    ])\n  },\n  {}\n)",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-merge-shape",
+      "type": "script",
+      "name": "Build API Payload",
+      "parentId": "folder-objects-grouping",
+      "open": true,
+      "expr": "{\n  \"meta\": {\n    \"requestId\": $requestId,\n    \"generatedFor\": Account.`Account Name`,\n    \"currency\": $currency\n  },\n  \"summary\": {\n    \"totalItems\": $sum(Account.Order.Product.Quantity),\n    \"categories\": $distinct(Account.Order.Product.Category)\n  },\n  \"contacts\": Account.Contacts.{\n    \"type\": Type,\n    \"value\": Value\n  }\n}",
+      "input": "",
+      "order": 1
+    },
+    {
+      "id": "folder-functions-variables",
+      "type": "folder",
+      "name": "Variables & Functions",
+      "parentId": "folder-demo-root",
+      "color": "#b07ef8",
+      "open": true,
+      "expr": "",
+      "input": "",
+      "order": 3
+    },
+    {
+      "id": "script-let-bindings",
+      "type": "script",
+      "name": "Variables And Reuse",
+      "parentId": "folder-functions-variables",
+      "open": true,
+      "expr": "(\n  $products := Account.Order.Product;\n  $lineTotals := $products.(Price * Quantity);\n  $highMargin := $products[Margin >= $minMargin];\n  {\n    \"count\": $count($products),\n    \"averageLineValue\": $round($average($lineTotals), 2),\n    \"highMarginSkus\": $highMargin.SKU,\n    \"topContact\": Account.Contacts[Primary = true][0].Value\n  }\n)",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-custom-functions",
+      "type": "script",
+      "name": "Custom Functions",
+      "parentId": "folder-functions-variables",
+      "open": true,
+      "expr": "Account.Order.Product.{\n  \"slug\": $slug(`Product Name`),\n  \"formattedPrice\": $formatMoney(Price, $currency),\n  \"buyerInitials\": $initials(Account.`Account Name`),\n  \"tagLine\": $joinWords([`Product Name`, Category])\n}",
+      "input": "",
+      "order": 1
+    },
+    {
+      "id": "script-string-functions",
+      "type": "script",
+      "name": "String Functions",
+      "parentId": "folder-functions-variables",
+      "open": true,
+      "expr": "Account.Order.Product.{\n  \"original\": `Product Name`,\n  \"upper\": $uppercase(`Product Name`),\n  \"trimmedCategory\": $trim(Category),\n  \"firstWord\": $substringBefore(`Product Name`, \" \"),\n  \"containsHat\": $contains(`Product Name`, /hat/i),\n  \"slug\": $slug(`Product Name`)\n}",
+      "input": "",
+      "order": 2
+    },
+    {
+      "id": "script-array-functions",
+      "type": "script",
+      "name": "Array Functions",
+      "parentId": "folder-functions-variables",
+      "open": true,
+      "expr": "{\n  \"categories\": $distinct(Account.Order.Product.Category),\n  \"allTags\": $sort($distinct(Account.Order.Product.Tags[])),\n  \"reversedSkus\": $reverse(Account.Order.Product.SKU),\n  \"categoryPairs\": $zip(Account.Order.Product.SKU, Account.Order.Product.Category)\n}",
+      "input": "",
+      "order": 3
+    },
+    {
+      "id": "script-number-date-functions",
+      "type": "script",
+      "name": "Number & Date Functions",
+      "parentId": "folder-functions-variables",
+      "open": true,
+      "expr": "{\n  \"roundedRevenue\": $round($sum(Account.Order.Product.(Price * Quantity)), 2),\n  \"maxPrice\": $max(Account.Order.Product.Price),\n  \"minPrice\": $min(Account.Order.Product.Price),\n  \"generatedAt\": $fromMillis($millis(), \"[Y0001]-[M01]-[D01] [H01]:[m01]:[s01]\"),\n  \"taxPreview\": $round($sum(Account.Order.Product.(Price * Quantity)) * $vatRate, 2)\n}",
+      "input": "",
+      "order": 4
+    },
+    {
+      "id": "script-object-functions",
+      "type": "script",
+      "name": "Object Functions",
+      "parentId": "folder-functions-variables",
+      "open": true,
+      "expr": "(\n  $summary := {\n    \"account\": Account.`Account Name`,\n    \"region\": Account.Region,\n    \"orders\": $count(Account.Order)\n  };\n  {\n    \"keys\": $keys($summary),\n    \"values\": $summary.*,\n    \"lookupRegion\": $lookup($summary, \"region\"),\n    \"spread\": $spread($summary)\n  }\n)",
+      "input": "",
+      "order": 5
+    },
+    {
+      "id": "folder-predicates",
+      "type": "folder",
+      "name": "Predicates & Conditions",
+      "parentId": "folder-demo-root",
+      "color": "#e05252",
+      "open": true,
+      "expr": "",
+      "input": "",
+      "order": 4
+    },
+    {
+      "id": "script-conditional-output",
+      "type": "script",
+      "name": "Conditional Output",
+      "parentId": "folder-predicates",
+      "open": true,
+      "expr": "Account.Order.Product.{\n  \"product\": `Product Name`,\n  \"status\": Price * Quantity >= $prioritySpend ? \"priority\" : \"standard\",\n  \"isAccessory\": Category = \"Accessories\",\n  \"needsRestock\": Quantity <= 2\n}",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-assertions",
+      "type": "script",
+      "name": "Assertions & Errors",
+      "parentId": "folder-predicates",
+      "open": true,
+      "expr": "(\n  $assert($exists(Account.Contacts[Primary = true]), \"Primary contact missing\");\n  {\n    \"primaryContact\": Account.Contacts[Primary = true][0].Value,\n    \"activeRegion\": Account.Region\n  }\n)",
+      "input": "",
+      "order": 1
+    },
+    {
+      "id": "folder-transformations",
+      "type": "folder",
+      "name": "Transformations",
+      "parentId": "folder-demo-root",
+      "color": "#38c4c4",
+      "open": true,
+      "expr": "",
+      "input": "",
+      "order": 5
+    },
+    {
+      "id": "script-invoice-lines",
+      "type": "script",
+      "name": "Invoice Lines",
+      "parentId": "folder-transformations",
+      "open": true,
+      "expr": "Account.Order.{\n  \"orderId\": OrderID,\n  \"invoiceLines\": Product.{\n    \"description\": `Product Name` & \" (\" & SKU & \")\",\n    \"qty\": Quantity,\n    \"unitPrice\": Price,\n    \"lineTotal\": $round(Price * Quantity, 2),\n    \"withVat\": $round((Price * Quantity) * (1 + $vatRate), 2)\n  }\n}",
+      "input": "",
+      "order": 0
+    },
+    {
+      "id": "script-external-input",
+      "type": "script",
+      "name": "Script With Local Input Override",
+      "parentId": "folder-transformations",
+      "open": true,
+      "expr": "{\n  \"customer\": customer.name,\n  \"eligibleOrders\": orders[status = \"paid\" and total >= $minSpend].{\n    \"id\": id,\n    \"total\": total,\n    \"region\": region\n  },\n  \"eligibleCount\": $count(orders[status = \"paid\" and total >= $minSpend])\n}",
+      "input": "{\n  \"customer\": {\n    \"name\": \"Northwind Labs\"\n  },\n  \"orders\": [\n    { \"id\": \"NW-100\", \"status\": \"paid\", \"total\": 420, \"region\": \"APAC\" },\n    { \"id\": \"NW-101\", \"status\": \"draft\", \"total\": 80, \"region\": \"APAC\" },\n    { \"id\": \"NW-102\", \"status\": \"paid\", \"total\": 190, \"region\": \"NA\" },\n    { \"id\": \"NW-103\", \"status\": \"paid\", \"total\": 620, \"region\": \"EMEA\" }\n  ]\n}",
+      "order": 1
+    }
+  ],
+  "settings": {
+    "globalContext": "{\n  \"Account\": {\n    \"Account Name\": \"Firefly Trading\",\n    \"Region\": \"APAC\",\n    \"Order\": [\n      {\n        \"OrderID\": \"order-103\",\n        \"Status\": \"paid\",\n        \"Product\": [\n          {\n            \"Product Name\": \"Bowler Hat\",\n            \"ProductID\": 858383,\n            \"SKU\": \"0406654608\",\n            \"Category\": \"Accessories\",\n            \"Price\": 34.45,\n            \"Quantity\": 2,\n            \"Margin\": 0.31,\n            \"Tags\": [\"featured\", \"seasonal\"]\n          },\n          {\n            \"Product Name\": \"Trilby Hat\",\n            \"ProductID\": 858236,\n            \"SKU\": \"0406634348\",\n            \"Category\": \"Accessories\",\n            \"Price\": 21.67,\n            \"Quantity\": 1,\n            \"Margin\": 0.24,\n            \"Tags\": [\"classic\"]\n          }\n        ]\n      },\n      {\n        \"OrderID\": \"order-104\",\n        \"Status\": \"paid\",\n        \"Product\": [\n          {\n            \"Product Name\": \"Cloak\",\n            \"ProductID\": 345664,\n            \"SKU\": \"0406654603\",\n            \"Category\": \"Apparel\",\n            \"Price\": 107.99,\n            \"Quantity\": 1,\n            \"Margin\": 0.44,\n            \"Tags\": [\"premium\", \"winter\"]\n          },\n          {\n            \"Product Name\": \"Leather Boots\",\n            \"ProductID\": 945551,\n            \"SKU\": \"0408890012\",\n            \"Category\": \"Footwear\",\n            \"Price\": 89.5,\n            \"Quantity\": 3,\n            \"Margin\": 0.37,\n            \"Tags\": [\"premium\", \"bestseller\"]\n          }\n        ]\n      },\n      {\n        \"OrderID\": \"order-105\",\n        \"Status\": \"draft\",\n        \"Product\": [\n          {\n            \"Product Name\": \"Compass\",\n            \"ProductID\": 119922,\n            \"SKU\": \"0401199221\",\n            \"Category\": \"Equipment\",\n            \"Price\": 12.25,\n            \"Quantity\": 5,\n            \"Margin\": 0.18,\n            \"Tags\": [\"travel\"]\n          }\n        ]\n      }\n    ],\n    \"Contacts\": [\n      { \"Type\": \"billing\", \"Value\": \"billing@firefly.example\", \"Primary\": false },\n      { \"Type\": \"operations\", \"Value\": \"ops@firefly.example\", \"Primary\": true },\n      { \"Type\": \"support\", \"Value\": \"support@firefly.example\", \"Primary\": false }\n    ]\n  }\n}",
+    "bindings": "{\n  \"requestId\": \"req-demo-001\",\n  \"currency\": \"USD\",\n  \"vatRate\": 0.1,\n  \"minPrice\": 25,\n  \"minSpend\": 200,\n  \"minMargin\": 0.3,\n  \"prioritySpend\": 120,\n  \"targetRegion\": \"APAC\"\n}",
+    "customFunctions": "{\n  slug: (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),\n  initials: (value) => String(value).trim().split(/\\s+/).map(part => part[0] || '').join('').toUpperCase(),\n  joinWords: (parts) => Array.isArray(parts) ? parts.filter(Boolean).join(' ') : String(parts),\n  formatMoney: {\n    implementation: (value, currency) => new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0)),\n    description: 'Format a number using Intl currency formatting'\n  }\n}"
+  }
+}
