@@ -1,5 +1,5 @@
 <template>
-  <div class="workbench-host">
+  <div class="workbench-host" :class="{ 'sidebar-auto-open': sidebarOpen }">
     <div class="hdr">
       <div class="logo" @click="callRuntime('goHome')">
         <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
@@ -23,9 +23,26 @@
     </div>
 
     <div class="ws">
-      <div class="sb">
+      <button
+        v-if="!sidebarOpen"
+        class="sb-peek"
+        type="button"
+        aria-label="Open collections sidebar"
+        @mouseenter="sidebarOpen = true"
+      >
+        <span class="sb-peek-arrow">›</span>
+      </button>
+      <div class="sb" @mouseenter="onSidebarEnter" @mouseleave="onSidebarLeave">
         <div class="sbhd">
           <span class="sbtitle">Collections</span>
+          <button
+            class="sibtn"
+            :title="sidebarCollapsed ? 'Pin sidebar open' : 'Collapse sidebar'"
+            :aria-label="sidebarCollapsed ? 'Pin sidebar open' : 'Collapse sidebar'"
+            @click="toggleSidebarCollapse"
+          >
+            {{ sidebarCollapsed ? '⇥' : '⇤' }}
+          </button>
           <button class="sibtn" title="New Collection" @click="openAddModal('folder', null)">📁</button>
           <button class="sibtn" title="New Script" @click="openAddModal('script', null)">＋</button>
         </div>
@@ -107,11 +124,15 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import '../workbench/styles.css'
 
 let disposeWorkbench: null | (() => void) = null
+const sidebarOpen = ref(false)
+const sidebarCollapsed = ref(false)
+let sidebarHover = false
+let lastMouseX = Number.POSITIVE_INFINITY
 
 type RuntimeAction =
   | 'goHome'
@@ -140,13 +161,48 @@ function ctxDo(action: 'af' | 'as' | 'rn' | 'del') {
   if (typeof fn === 'function') (fn as (value: 'af' | 'as' | 'rn' | 'del') => void)(action)
 }
 
+function updateSidebarState(x: number) {
+  lastMouseX = x
+  if (!sidebarCollapsed.value) {
+    sidebarOpen.value = true
+    return
+  }
+  if (sidebarHover) {
+    sidebarOpen.value = true
+    return
+  }
+  sidebarOpen.value = x <= 18
+}
+
+function handlePointerMove(event: MouseEvent) {
+  updateSidebarState(event.clientX)
+}
+
+function onSidebarEnter() {
+  sidebarHover = true
+  sidebarOpen.value = true
+}
+
+function onSidebarLeave() {
+  sidebarHover = false
+  sidebarOpen.value = lastMouseX <= 18
+}
+
+function toggleSidebarCollapse() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  sidebarOpen.value = !sidebarCollapsed.value
+}
+
 onMounted(() => {
+  sidebarOpen.value = true
+  window.addEventListener('mousemove', handlePointerMove)
   void import('../workbench/runtime.js').then(({ initWorkbench }) => {
     disposeWorkbench = initWorkbench()
   })
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('mousemove', handlePointerMove)
   disposeWorkbench?.()
   disposeWorkbench = null
 })
