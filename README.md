@@ -282,6 +282,8 @@ The remaining work, if any, is normal product or architecture work rather than m
 - the workbench runtime still uses an imperative DOM-driven model internally
 - there is currently no automated smoke-test suite
 
-## License / Usage
+## License
 
-No license file is included yet. If you plan to open-source the project, add a `LICENSE` file before publishing broadly.
+This project is licensed under the `MIT` License.
+
+See [LICENSE](/Users/namanagarwal/Code/Jsonata%20Collections/LICENSE).
