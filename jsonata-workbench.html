@@ -2095,13 +2095,14 @@
         return { line: Number(m[1]), column: Number(m[2]) };
       }
 
-      function focusEditorLocation(view, loc) {
+      function focusEditorLocation(view, loc, { moveCursor = false, focus = false } = {}) {
         if (!view || !loc || !loc.line) return;
+        if (window._CM?.setEditorErrorLocation) window._CM.setEditorErrorLocation(view, loc);
+        if (!moveCursor) return;
         const doc = view.state.doc.toString();
         const anchor = getOffsetFromLineCol(doc, loc.line, loc.column || 1);
-        if (window._CM?.setEditorErrorLocation) window._CM.setEditorErrorLocation(view, loc);
         view.dispatch({ selection: { anchor }, scrollIntoView: true });
-        view.focus();
+        if (focus) view.focus();
       }
 
       function clearEditorLocationHighlight(view) {
