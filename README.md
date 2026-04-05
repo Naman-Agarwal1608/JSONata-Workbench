@@ -41,6 +41,24 @@ This gives you:
 - GitHub Pages deployment
 - room to migrate the app into Vue components without breaking the current behavior immediately
 
+## Why The App Still Says "Legacy"
+
+At the moment, the Vue app is acting as a migration shell.
+
+That means:
+
+- the original workbench is still the real working application
+- the Vue app hosts it so the repo can gain proper structure, build output, and deployment
+- migration can now happen safely in phases instead of rewriting the whole app in one step
+
+This is intentional.
+
+The current goal is:
+
+1. preserve the working behavior
+2. add proper project/build/deploy infrastructure
+3. port the UI into Vue component-by-component afterward
+
 ## Features In The Workbench
 
 The workbench itself currently supports:
@@ -309,6 +327,54 @@ The repository includes a GitHub Actions workflow that:
 3. uploads `dist/` as a build artifact
 4. deploys the same output to GitHub Pages on pushes to `main`
 
+### One-Time GitHub Pages Setup
+
+If the workflow fails with a Pages error such as:
+
+- `Get Pages site failed`
+- `Please verify that the repository has Pages enabled`
+
+then the repository usually needs one-time Pages setup in GitHub.
+
+In GitHub:
+
+1. Open the repository.
+2. Go to `Settings`.
+3. Open `Pages`.
+4. Under `Build and deployment`, set `Source` to `GitHub Actions`.
+
+After that, rerun the workflow.
+
+### Notes About Repository Visibility
+
+For the simplest GitHub Pages setup:
+
+- public repository is the easiest path
+
+Private repositories can also work depending on your GitHub plan and settings, but public is the least friction path.
+
+### What The Workflow Produces
+
+Each successful run produces:
+
+- a downloadable `dist` artifact
+- a GitHub Pages deployment built from the same `dist` output
+
+### Local Build Verification
+
+Before pushing to `main`, you can verify the same output locally:
+
+```bash
+npm install
+npm run build
+```
+
+That should generate a static `dist/` folder containing:
+
+- the Vue shell
+- the legacy workbench HTML
+- the demo workspace JSON
+
 ## Keyboard Shortcuts
 
 Inside the workbench:
@@ -331,3 +397,13 @@ That means:
 - build/deploy structure is already in place
 - the current app is still usable today
 - future refactors can port one area at a time instead of rewriting everything in one risky step
+
+The planned migration order is:
+
+1. app shell and shared state
+2. sidebar tree and tabs
+3. landing page
+4. editor workspace
+5. execution inspector and modals
+6. persistence and execution composables
+7. removal of the embedded legacy page once feature parity is reached
