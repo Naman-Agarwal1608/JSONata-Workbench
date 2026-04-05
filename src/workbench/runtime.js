@@ -11,9 +11,37 @@ import * as langJavascript from '@codemirror/lang-javascript'
 import * as theme from '@codemirror/theme-one-dark'
 import * as langJsonata from '@jsonhero/codemirror-lang-jsonata'
 
+let activeCleanup = null
+let activeInstanceId = 0
+
 export function initWorkbench() {
-  if (window.__jsonataWorkbenchInitialized) return
-  window.__jsonataWorkbenchInitialized = true
+  activeCleanup?.()
+  const instanceId = ++activeInstanceId
+  let disposed = false
+  const runtimeActions = {
+    goHome,
+    toggleTheme,
+    pickFile,
+    saveNow,
+    exportFile,
+    importFile,
+    openAddModal,
+    closeOv,
+    confirmAdd,
+    confirmRename,
+    confirmDelete,
+    ctxDo,
+    runExpr,
+    fmtJSON,
+    minJSON,
+    clearInput,
+    toggleExecContext,
+    pickC
+  }
+
+  function isCurrent() {
+    return !disposed && instanceId === activeInstanceId
+  }
 
   // ── JSONATA loader ────────────────────────────────────────────
   let JR = true; // jsonata ready
@@ -157,6 +185,7 @@ export function initWorkbench() {
           if (perm === 'denied') return false;
           const file = await handle.getFile();
           const parsed = normalizeDB(JSON.parse(await file.text()));
+          if (!isCurrent()) return false;
           fh = handle;
           db = parsed;
           resetWorkspaceViewState();
@@ -192,14 +221,17 @@ export function initWorkbench() {
         try {
           const meta = JSON.parse(localStorage.getItem(SK) || '{}');
           const savedHandle = await loadSavedHandle();
+          if (!isCurrent()) return;
           if (savedHandle) {
             if (await readLinkedFile(savedHandle)) {
               await saveHandleMeta();
               return;
             }
+            if (!isCurrent()) return;
             fh = null;
             await clearHandleMeta();
           }
+          if (!isCurrent()) return;
           if (meta?.linkedFileName) slabel('Unlinked · ' + meta.linkedFileName);
         } catch { }
       }
@@ -1563,7 +1595,7 @@ export function initWorkbench() {
       function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
       // ── KEYBOARD ──────────────────────────────────────────────────
-      document.addEventListener('keydown', e => {
+      function handleKeyDown(e) {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); runExpr(); }
         if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveNow(); }
         if (e.key === 'Escape') closeOv();
@@ -1572,7 +1604,8 @@ export function initWorkbench() {
           if (document.getElementById('rnOv')?.classList.contains('open')) { e.preventDefault(); confirmRename(); }
           if (document.getElementById('delOv')?.classList.contains('open')) { e.preventDefault(); confirmDelete(); }
         }
-      });
+      }
+      document.addEventListener('keydown', handleKeyDown);
 
       // ── INIT ──────────────────────────────────────────────────────
 
@@ -1936,30 +1969,37 @@ export function initWorkbench() {
       }
 
       setupCodeMirror();
-      Object.assign(window, {
-        goHome,
-        toggleTheme,
-        pickFile,
-        saveNow,
-        exportFile,
-        importFile,
-        openAddModal,
-        closeOv,
-        confirmAdd,
-        confirmRename,
-        confirmDelete,
-        ctxDo,
-        runExpr,
-        fmtJSON,
-        minJSON,
-        clearInput,
-        toggleExecContext,
-        pickC
-      });
+      Object.assign(window, runtimeActions);
       initTheme();
       renderTree();
       renderMain();
       setStat('Ready');
       slabel('No file linked');
       bootPersistence();
+
+      function destroyEditors() {
+        if (inputEditor) { inputEditor.destroy(); inputEditor = null; }
+        if (outputEditor) { outputEditor.destroy(); outputEditor = null; }
+        if (exprEditor) { exprEditor.destroy(); exprEditor = null; }
+        if (landingContextEditor) { landingContextEditor.destroy(); landingContextEditor = null; }
+        if (landingBindingsEditor) { landingBindingsEditor.destroy(); landingBindingsEditor = null; }
+        if (landingFunctionsEditor) { landingFunctionsEditor.destroy(); landingFunctionsEditor = null; }
+        destroyInspectValueEditor();
+      }
+
+      const cleanup = () => {
+        if (disposed) return;
+        disposed = true;
+        if (activeCleanup === cleanup) activeCleanup = null;
+        clearTimeout(saveTimer);
+        clearTimeout(runTimer);
+        document.removeEventListener('keydown', handleKeyDown);
+        destroyEditors();
+        Object.entries(runtimeActions).forEach(([key, fn]) => {
+          if (window[key] === fn) delete window[key];
+        });
+      };
+
+      activeCleanup = cleanup;
+      return cleanup;
 }
