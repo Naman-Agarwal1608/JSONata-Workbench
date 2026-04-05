@@ -1,9 +1,12 @@
-import { callRuntime } from '../lib/runtimeBridge'
+import { useAppContext } from '../store/appContext'
 
 export function Header() {
+  const { state, dispatch, pickFile, saveNow, exportFile, importFile } = useAppContext()
+  const { theme, statusLabel, statusDot } = state
+
   return (
     <div className="hdr">
-      <div className="logo" onClick={() => callRuntime('goHome')}>
+      <div className="logo" onClick={() => dispatch({ type: 'GO_HOME' })}>
         <svg className="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
           <rect width="64" height="64" rx="14" fill="var(--surf3)" />
           <path d="M18 20h18a8 8 0 0 1 8 8v16H26a8 8 0 0 1-8-8V20Z" fill="var(--acc)" />
@@ -14,14 +17,19 @@ export function Header() {
       </div>
       <div className="hgap" />
       <div className="spill">
-        <div className="sdot" id="sdot" />
-        <span id="slabel">—</span>
+        <div className={`sdot${statusDot ? ' ' + statusDot : ''}`} />
+        <span>{statusLabel}</span>
       </div>
-      <button className="hbtn" id="themeBtn" onClick={() => callRuntime('toggleTheme')}>Theme</button>
-      <button className="hbtn" onClick={() => callRuntime('pickFile')}>📂 Link file</button>
-      <button className="hbtn" onClick={() => callRuntime('saveNow')}>💾 Save</button>
-      <button className="hbtn" onClick={() => callRuntime('exportFile')}>Export</button>
-      <button className="hbtn" onClick={() => callRuntime('importFile')}>Import</button>
+      <button
+        className="hbtn"
+        onClick={() => dispatch({ type: 'TOGGLE_THEME' })}
+      >
+        {theme === 'light' ? '☀ Light' : '☾ Dark'}
+      </button>
+      <button className="hbtn" onClick={pickFile}>📂 Link file</button>
+      <button className="hbtn" onClick={() => saveNow(true)}>💾 Save</button>
+      <button className="hbtn" onClick={exportFile}>Export</button>
+      <button className="hbtn" onClick={importFile}>Import</button>
     </div>
   )
 }

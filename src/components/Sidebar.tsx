@@ -1,4 +1,5 @@
-import { openAddModal } from '../lib/runtimeBridge'
+import { useAppContext } from '../store/appContext'
+import { SidebarTree } from './SidebarTree'
 
 interface SidebarProps {
   collapsed: boolean
@@ -8,6 +9,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggleCollapse, onMouseEnter, onMouseLeave }: SidebarProps) {
+  const { dispatch } = useAppContext()
+
   return (
     <div className="sb" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
       <div className="sbhd">
@@ -20,10 +23,20 @@ export function Sidebar({ collapsed, onToggleCollapse, onMouseEnter, onMouseLeav
         >
           {collapsed ? '⇥' : '⇤'}
         </button>
-        <button className="sibtn" title="New Collection" onClick={() => openAddModal('folder', null)}>📁</button>
-        <button className="sibtn" title="New Script" onClick={() => openAddModal('script', null)}>＋</button>
+        <button
+          className="sibtn"
+          title="New Collection"
+          onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'folder', parentId: null })}
+        >📁</button>
+        <button
+          className="sibtn"
+          title="New Script"
+          onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'script', parentId: null })}
+        >＋</button>
       </div>
-      <div className="tscroll" id="tscroll" />
+      <div className="tscroll">
+        <SidebarTree />
+      </div>
     </div>
   )
 }

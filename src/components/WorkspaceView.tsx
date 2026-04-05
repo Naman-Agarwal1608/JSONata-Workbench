@@ -1,0 +1,218 @@
+import { useEffect, useRef, useState } from 'react'
+import { CodeMirrorEditor } from './CodeMirrorEditor'
+import { TabBar } from './TabBar'
+import { InspectorPanel } from './InspectorPanel'
+import { useAppContext } from '../store/appContext'
+import { useExecution } from '../hooks/useExecution'
+import { useResizablePanels } from '../hooks/useResizablePanels'
+import { breadcrumb, findNode } from '../lib/workspace'
+import { parseCustomFunctions } from '../lib/customFunctions'
+import type { EditorView } from '../lib/codemirror'
+
+export function WorkspaceView() {
+  const { state, dispatch, schedSave } = useAppContext()
+  const { db, activeId, theme } = state
+
+  const node = findNode(db, activeId!)!
+  const inputEditorRef = useRef<EditorView | null>(null)
+  const exprEditorRef = useRef<EditorView | null>(null)
+
+  const { rszLeft, rszTop, hRszRef, vRszRef, panelsTopRef, panelsRef } = useResizablePanels()
+
+  const execution = useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef })
+  const {
+    outputText, outputState, runBadgeState, runBadgeText,
+    execCtx, execCtxExpanded, execCtxTab, inspectEntries,
+    run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue,
+  } = execution
+
+  const [jsonErr, setJsonErr] = useState('')
+
+  function getCustomFunctionEntries() {
+    const result = parseCustomFunctions(db.settings.customFunctions || '')
+    return result.ok ? (result.value ?? []) : []
+  }
+
+  function handleInputUpdate(val: string) {
+    dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'input', value: val })
+    schedSave()
+    setJsonErr(!val.trim() ? '' : (() => { try { JSON.parse(val); return '' } catch (e) { return '⚠ ' + (e instanceof Error ? e.message.split('\n')[0] : '') } })())
+    scheduleRun()
+  }
+
+  function handleInputPaste(val: string, view: EditorView) {
+    try {
+      const fmt = JSON.stringify(JSON.parse(val), null, 2)
+      if (fmt !== val) view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: fmt } })
+    } catch { /* not valid json, leave as-is */ }
+  }
+
+  function handleExprUpdate(val: string) {
+    dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'expr', value: val })
+    schedSave()
+    scheduleRun()
+  }
+
+  function fmtJSON() {
+    const view = inputEditorRef.current
+    if (!view) return
+    try {
+      const fmt = JSON.stringify(JSON.parse(view.state.doc.toString()), null, 2)
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: fmt } })
+    } catch { /* ignore */ }
+  }
+
+  function minJSON() {
+    const view = inputEditorRef.current
+    if (!view) return
+    try {
+      const min = JSON.stringify(JSON.parse(view.state.doc.toString()))
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: min } })
+    } catch { /* ignore */ }
+  }
+
+  function clearInput() {
+    const view = inputEditorRef.current
+    if (!view) return
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '' } })
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run() }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [run])
+
+  return (
+    <>
+      <TabBar />
+      <div className="editor">
+        <div className="etoolbar">
+          <input
+            className="ename"
+            defaultValue={node.name}
+            placeholder="Untitled"
+            onChange={e => {
+              dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'name', value: e.target.value })
+              schedSave()
+            }}
+          />
+          <span className="bctag" title={breadcrumb(db, activeId!)}>{breadcrumb(db, activeId!)}</span>
+          <button className="hbtn prim" onClick={run}>
+            ▶ Run <small style={{ opacity: .55, fontSize: 10 }}>⌘↵</small>
+          </button>
+        </div>
+
+        <div className="panels" ref={panelsRef}>
+          <div
+            className="panels-top"
+            ref={panelsTopRef}
+            style={{ flexGrow: rszTop, flexShrink: 1, flexBasis: 0 }}
+          >
+            <div className="panel" id="panelInput" style={{ flexGrow: rszLeft, flexShrink: 1, flexBasis: 0 }}>
+              <div className="phead">
+                <span className="ptitle">Input JSON</span>
+                {jsonErr && <span className="jerr">{jsonErr}</span>}
+              </div>
+              <div className="jtoolbar">
+                <button className="jbtn" onClick={fmtJSON}>Format</button>
+                <button className="jbtn" onClick={minJSON}>Minify</button>
+                <button className="jbtn" onClick={clearInput}>Clear</button>
+              </div>
+              <div className="cm-wrap">
+                <CodeMirrorEditor
+                  key={`input-${activeId}-${theme}`}
+                  initialValue={node.input}
+                  mode="json"
+                  withErrorMarkers
+                  theme={theme}
+                  editorRef={inputEditorRef}
+                  onUpdate={handleInputUpdate}
+                  onPaste={handleInputPaste}
+                />
+              </div>
+            </div>
+
+            <div className="rsz-h" ref={hRszRef} />
+
+            <div className="panel" id="panelExpr" style={{ flexGrow: 100 - rszLeft, flexShrink: 1, flexBasis: 0 }}>
+              <div className="phead">
+                <span className="ptitle">Expression</span>
+                {runBadgeState && (
+                  <span
+                    className={`pbadge${runBadgeState ? ' ' + runBadgeState : ''}`}
+                    dangerouslySetInnerHTML={{ __html: runBadgeText }}
+                  />
+                )}
+              </div>
+              <div className="cm-wrap">
+                <CodeMirrorEditor
+                  key={`expr-${activeId}-${theme}`}
+                  initialValue={node.expr}
+                  mode="jsonata"
+                  withErrorMarkers
+                  theme={theme}
+                  editorRef={exprEditorRef}
+                  getCustomFunctionEntries={getCustomFunctionEntries}
+                  onUpdate={handleExprUpdate}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="rsz-v" ref={vRszRef} />
+
+          <div
+            className="panel"
+            id="panelOut"
+            style={{ flexGrow: 100 - rszTop, flexShrink: 1, flexBasis: 0, borderTop: '1px solid var(--bdr)' }}
+          >
+            <div className="phead">
+              <span className="ptitle">Output</span>
+              {runBadgeState && (
+                <span
+                  className={`pbadge${runBadgeState ? ' ' + runBadgeState : ''}`}
+                  dangerouslySetInnerHTML={{ __html: runBadgeText }}
+                />
+              )}
+            </div>
+
+            {outputState === 'ok' ? (
+              <div className="cm-wrap">
+                <CodeMirrorEditor
+                  key={`out-${activeId}-${theme}-${outputText.slice(0, 20)}`}
+                  initialValue={outputText}
+                  mode="json"
+                  readOnly
+                  withErrorMarkers
+                  theme={theme}
+                />
+              </div>
+            ) : (
+              <div className={`outview${outputState === 'err' ? ' err' : outputState === 'empty' ? ' empty' : ''}`}>
+                {outputText}
+              </div>
+            )}
+
+            <InspectorPanel
+              execCtx={execCtx}
+              execCtxExpanded={execCtxExpanded}
+              execCtxTab={execCtxTab}
+              inspectEntries={inspectEntries}
+              onToggle={toggleExecCtx}
+              onSetTab={setExecCtxTab}
+              onInspectValue={openInspectValue}
+            />
+          </div>
+        </div>
+
+        <div className="sbar">
+          <span>{runBadgeText}</span>
+        </div>
+      </div>
+    </>
+  )
+}
