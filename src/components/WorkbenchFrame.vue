@@ -1,11 +1,11 @@
 <template>
   <section class="frame-shell">
     <div class="frame-note">
-      <h1>Current App Preserved</h1>
+      <h1>Workbench Runtime</h1>
       <p>
-        The existing workbench is currently hosted intact inside the new Vue project so build,
-        deploy, and repo structure can land without changing behavior. The next migration step is
-        porting the UI into Vue components one area at a time.
+        The current fully working runtime is still mounted here while the shell, state, and tree
+        model move into Vue. The goal is to replace this incrementally without losing feature
+        parity.
       </p>
     </div>
 

@@ -9,13 +9,13 @@
       </svg>
       <div class="brand-copy">
         <strong>jsonata.workbench</strong>
-        <span>Vue/Vite migration shell</span>
+        <span>Vue migration in progress</span>
       </div>
     </div>
 
     <div class="actions">
       <a class="action" href="./jsonata-demo-workspace.json" download>Download Demo Workspace</a>
-      <a class="action" href="./legacy/workbench-legacy.html" target="_blank" rel="noreferrer">Open Legacy Workbench</a>
+      <a class="action" href="./legacy/workbench-legacy.html" target="_blank" rel="noreferrer">Open Standalone Workbench</a>
     </div>
   </header>
 </template>
