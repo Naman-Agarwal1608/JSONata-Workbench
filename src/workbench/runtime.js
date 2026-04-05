@@ -66,6 +66,25 @@ export function initWorkbench() {
         };
       }
       function getSettings() { return db.settings || (db.settings = { globalContext: '', bindings: '', customFunctions: '' }); }
+      function hasWorkspaceContent(candidate = db) {
+        return !!(candidate && Array.isArray(candidate.nodes) && candidate.nodes.length);
+      }
+      async function loadDefaultWorkspace() {
+        try {
+          const response = await fetch('./jsonata-demo-workspace.json');
+          if (!response.ok) throw new Error(`Failed to load default workspace (${response.status})`);
+          const parsed = normalizeDB(await response.json());
+          if (!hasWorkspaceContent(parsed)) return false;
+          db = parsed;
+          resetWorkspaceViewState();
+          renderAll();
+          slabel('Demo workspace loaded');
+          return true;
+        } catch (e) {
+          console.warn('Failed to load demo workspace:', e);
+          return false;
+        }
+      }
 
       // Workspace data persisted to disk.
       let db = normalizeDB();
@@ -232,6 +251,10 @@ export function initWorkbench() {
             await clearHandleMeta();
           }
           if (!isCurrent()) return;
+          if (!hasWorkspaceContent()) {
+            const loadedDefault = await loadDefaultWorkspace();
+            if (loadedDefault || !isCurrent()) return;
+          }
           if (meta?.linkedFileName) slabel('Unlinked · ' + meta.linkedFileName);
         } catch { }
       }
@@ -1043,9 +1066,16 @@ export function initWorkbench() {
       // ── RENDER MAIN ───────────────────────────────────────────────
       function renderMain() {
         const main = document.getElementById('main');
+        if (!main) return;
+        const landingMode = !activeId;
+        document.documentElement.classList.toggle('workbench-landing-mode', landingMode);
+        document.body.classList.toggle('workbench-landing-mode', landingMode);
+        document.querySelector('.workbench-host')?.classList.toggle('landing-mode', landingMode);
         destroyScriptEditors();
         destroyLandingEditors();
-        if (!activeId) {
+        main.classList.toggle('main-landing', landingMode);
+        main.classList.toggle('main-workspace', !landingMode);
+        if (landingMode) {
           main.innerHTML = renderLandingView();
           initLandingEditors();
           return;

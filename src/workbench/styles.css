@@ -55,6 +55,13 @@
         overflow: hidden
       }
 
+      html.workbench-landing-mode,
+      body.workbench-landing-mode {
+        height: auto;
+        min-height: 100%;
+        overflow: auto
+      }
+
       body {
         background: var(--bg);
         color: var(--tx);
@@ -170,7 +177,8 @@
       .ws {
         display: flex;
         flex: 1;
-        overflow: hidden
+        overflow: hidden;
+        min-height: 0
       }
 
       /* SIDEBAR */
@@ -456,7 +464,12 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        min-width: 0
+        min-width: 0;
+        min-height: 0
+      }
+
+      .main.main-landing {
+        overflow: auto
       }
 
       /* TABS */
@@ -1242,10 +1255,11 @@
       }
 
       .landing {
-        flex: 1;
+        flex: 1 0 auto;
         overflow: auto;
         padding: 28px;
         display: block;
+        min-height: 100%;
         background:
           radial-gradient(circle at top left, rgba(232, 184, 75, .08), transparent 28%),
           radial-gradient(circle at right 20%, rgba(91, 156, 246, .08), transparent 24%),
@@ -1398,15 +1412,15 @@
       }
 
       .landing-card.functions .landing-panel .cm-wrap {
-        height: 200px
+        height: 240px
       }
 
       .landing-card.functions .landing-panel .cm-editor {
-        height: 200px !important
+        height: 240px !important
       }
 
       .landing-card.functions .landing-panel .cm-scroller {
-        height: 200px !important
+        height: 240px !important
       }
 
       .landing-foot {

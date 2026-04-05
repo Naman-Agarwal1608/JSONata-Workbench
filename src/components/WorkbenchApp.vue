@@ -159,8 +159,15 @@ onBeforeUnmount(() => {
 }
 
 .workbench-host {
+  height: 100vh;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.workbench-host.landing-mode {
+  height: auto;
+  overflow: visible;
 }
 </style>

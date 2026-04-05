@@ -4,6 +4,23 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   base: './',
   plugins: [vue()],
+  resolve: {
+    dedupe: [
+      '@codemirror/state',
+      '@codemirror/view',
+      '@codemirror/commands',
+      '@codemirror/language',
+      '@codemirror/search',
+      '@codemirror/lint',
+      '@codemirror/autocomplete',
+      '@codemirror/lang-json',
+      '@codemirror/lang-javascript',
+      '@codemirror/theme-one-dark',
+      '@lezer/common',
+      '@lezer/highlight',
+      '@lezer/lr'
+    ]
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {
