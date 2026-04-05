@@ -2,18 +2,21 @@
 
 `JSONata Workbench` is a local-first JSONata playground and workspace for writing, organizing, and testing JSONata expressions against shared or per-script JSON input.
 
-The project is now set up as a small `Vue 3 + Vite + TypeScript` application, but the current app behavior is still preserved by embedding the existing workbench intact while the UI is migrated into components incrementally.
+The project now runs as a small `Vue 3 + Vite + TypeScript` app. The original single-file workbench was moved into project source files so it builds and deploys like a normal frontend project while preserving the same UI and behavior.
 
 ## Repo Layout
 
 - `src/`
-  Vue application shell and migration entry point.
+  Application source, including the mounted workbench component, runtime module, and styles.
 
 - `src/components/`
-  Vue components for the shell that hosts the current workbench.
+  Vue components, including the main `WorkbenchApp`.
 
-- `public/legacy/workbench-legacy.html`
-  The existing full workbench implementation preserved as-is.
+- `src/workbench/runtime.js`
+  The workbench runtime logic extracted from the original standalone file and mounted inside the app.
+
+- `src/workbench/styles.css`
+  The main workbench styles.
 
 - `public/jsonata-demo-workspace.json`
   Demo workspace showing grouped JSONata examples and built-in/custom function usage.
@@ -26,38 +29,20 @@ The project is now set up as a small `Vue 3 + Vite + TypeScript` application, bu
 
 ## Current Architecture
 
-Right now the repo has two layers:
+The app is built and served by `Vite`, but the workbench itself still keeps the same imperative runtime model internally:
 
-1. `Vue/Vite shell`
-   Handles project structure, build output, and deployment pipeline.
+1. `Vue app shell`
+   Mounts the workbench as part of the project, handles bundling, and provides the deployable app entrypoint.
 
-2. `Legacy workbench`
-   The original fully working HTML app, embedded in the Vue app to preserve the existing UI and behavior while migration happens safely.
+2. `Workbench runtime module`
+   Contains the original workspace, editor, persistence, and execution logic, now moved into normal source files instead of a separate HTML page.
 
 This gives you:
 
 - maintainable project structure
 - buildable static output in `dist/`
 - GitHub Pages deployment
-- room to migrate the app into Vue components without breaking the current behavior immediately
-
-## Why The App Still Says "Legacy"
-
-At the moment, the Vue app is acting as a migration shell.
-
-That means:
-
-- the original workbench is still the real working application
-- the Vue app hosts it so the repo can gain proper structure, build output, and deployment
-- migration can now happen safely in phases instead of rewriting the whole app in one step
-
-This is intentional.
-
-The current goal is:
-
-1. preserve the working behavior
-2. add proper project/build/deploy infrastructure
-3. port the UI into Vue component-by-component afterward
+- a cleaner base for later refactors without breaking existing behavior first
 
 ## Features In The Workbench
 
@@ -269,14 +254,14 @@ This matters because linked-file save workflows rely on the File System Access A
 
 ## Runtime Dependencies
 
-The workbench itself still loads runtime libraries from CDNs:
+The workbench now bundles its core runtime dependencies through npm/Vite:
 
-- JSONata
-- CodeMirror 6
-- JSONata CodeMirror language package
-- Google Fonts
+- `jsonata`
+- `CodeMirror 6`
+- `@jsonhero/codemirror-lang-jsonata`
+- `Vue 3`
 
-So the current app still expects network access unless these are later vendored locally.
+Fonts are still loaded from Google Fonts.
 
 ## Development
 
@@ -308,8 +293,7 @@ npm run preview
 
 The Vite build generates a static `dist/` folder containing:
 
-- the Vue shell
-- the embedded legacy workbench page
+- the app bundle
 - the demo workspace JSON
 
 That output can be used as:
@@ -371,8 +355,7 @@ npm run build
 
 That should generate a static `dist/` folder containing:
 
-- the Vue shell
-- the legacy workbench HTML
+- the app bundle
 - the demo workspace JSON
 
 ## Keyboard Shortcuts
@@ -388,22 +371,12 @@ Inside the workbench:
 - `Escape`
   Close open overlays/modals
 
-## Migration Direction
+## Notes On Internal Structure
 
-The current goal is to migrate the preserved workbench gradually into Vue components while keeping the behavior stable.
+The workbench has already been moved out of the old standalone HTML file, but the runtime is still intentionally kept close to the original implementation so behavior stays stable.
 
-That means:
+The next refactor steps, if you want them later, are internal cleanup rather than migration:
 
-- build/deploy structure is already in place
-- the current app is still usable today
-- future refactors can port one area at a time instead of rewriting everything in one risky step
-
-The planned migration order is:
-
-1. app shell and shared state
-2. sidebar tree and tabs
-3. landing page
-4. editor workspace
-5. execution inspector and modals
-6. persistence and execution composables
-7. removal of the embedded legacy page once feature parity is reached
+1. split the runtime into `persistence`, `tree`, `editors`, and `execution` modules
+2. replace remaining inline DOM event usage with Vue event handling
+3. convert major surfaces like the sidebar, landing page, and inspector into native Vue components
