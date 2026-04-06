@@ -2,17 +2,21 @@
 
 `JSONata Workbench` is a local-first JSONata workspace for writing, organizing, and testing JSONata expressions against shared or per-script JSON input.
 
-It runs as a `React 18 + Vite + TypeScript` app with a browser-based workbench feel and no backend required.
+It runs as a static `React 18 + Vite + TypeScript` app with no backend.
+
+## Live Demo
+
+- GitHub Pages: `https://naman-agarwal1608.github.io/JSONata-Workbench/`
+
 
 ## What It Does
 
 - organize JSONata scripts into collections
-- edit JSON input and JSONata expressions side-by-side
-- define global context and bindings
-- register reusable custom functions
-- inspect results and intermediate resolved values
-- save a linked workspace file with auto-save
-- import/export workspace snapshots
+- edit input JSON, JSONata expressions, and output side-by-side
+- define global context, bindings, and reusable custom functions
+- inspect results and resolved values in a dedicated inspector
+- auto-save to a linked workspace file
+- import and export workspace snapshots
 - run as a static frontend app and deploy to GitHub Pages
 
 ## Main Features
@@ -22,7 +26,8 @@ It runs as a `React 18 + Vite + TypeScript` app with a browser-based workbench f
 - folder/script tree in the left sidebar
 - tabbed editing for open scripts
 - per-script input JSON and expression storage
-- root landing page for global workspace configuration
+- landing page for workspace-wide execution settings
+- collapsible sidebar with hover-to-open behavior when collapsed
 
 ### Shared Execution Inputs
 
@@ -37,64 +42,75 @@ It runs as a `React 18 + Vite + TypeScript` app with a browser-based workbench f
 
 ### Editors
 
-The workbench uses `CodeMirror 6` for all editors.
+The workbench uses `CodeMirror 6` everywhere.
 
-- JSON editor support for input, output, bindings, and global context
+- JSON editors for input, output, global context, bindings, and value inspection
 - JSONata editor for expressions
 - JavaScript editor for custom functions
-- autocomplete for JSONata built-ins and custom functions
+- autocomplete for JSONata built-ins and workspace custom functions
 - hover help for JSONata functions
 - search support
 - code folding
 - collapsed JSON summaries such as object key counts and array item counts
 - line highlighting for detected error locations
 
-### Output And Inspector
+### Execution Experience
 
-- formatted JSON output panel
-- automatic error reporting with line/column when available
-- bottom `Inspector` panel with tabbed views:
-  - `Execution Context`
-  - `Available Scope`
-  - `Custom Functions`
-- resolved values can be opened in a read-only value inspector modal
+- live auto-run while editing
+- manual run with `Cmd/Ctrl + Enter`
+- execution timing shown in the bottom status bar
+- `Running…` feedback while a queued run is pending
+- formatted JSON output
+- error reporting with line/column when available
+
+### Inspector
+
+The bottom `Inspector` panel includes tabbed views for:
+
+- `Execution Context`
+- `Available Scope`
+- `Custom Functions`
+
+Resolved values can be opened in a read-only value inspector modal.
 
 ### Persistence And File Flows
 
 - `Link file`
-  Links the workspace to a real JSON file on disk
+  Links the workspace to a real JSON file on disk.
 
 - `Save`
-  Saves to the linked file
+  Saves to the linked file.
 
 - `Export`
-  Writes a snapshot copy without changing the linked file
+  Writes a snapshot copy without changing the linked file.
 
 - `Import`
-  Loads a workspace JSON file into memory as the current workspace
+  Loads a workspace JSON file into memory as the current workspace.
 
 - auto-save after edits once a file is linked
 
 ### UI
 
 - dark mode and light mode
-- collapsible left sidebar
-- hover-to-open sidebar when collapsed
+- resizable editor/output split
 - landing page for workspace-wide settings
+- explicit sidebar collapse button plus hover-open when collapsed
 
 ## How Evaluation Works
 
 When you run a script:
 
-1. the app picks per-script input JSON if present
+1. the app uses per-script input JSON if present
 2. otherwise it falls back to `Global Context`
 3. `Bindings` are passed into JSONata as variables
 4. `Custom Functions` are registered
-5. the JSONata expression is evaluated
+5. the JSONata expression is compiled and evaluated
 6. the output panel renders the result
 7. the inspector builds execution context details
 
-## Example: Bindings
+## Examples
+
+### Example: Bindings
 
 ```json
 {
@@ -105,7 +121,7 @@ When you run a script:
 
 This makes `$limit` and `$currency` available in expressions.
 
-## Example: Custom Functions
+### Example: Custom Functions
 
 ```js
 {
@@ -133,50 +149,65 @@ $formatMoney(19.99, $currency)
 
 ## Project Structure
 
-```
+```text
 src/
   components/
-    WorkbenchApp.tsx        root component, mounts providers and layout shell
+    WorkbenchApp.tsx
     editor/
-      WorkspaceView.tsx     three-panel script editor (input / expression / output)
-      TabBar.tsx            open-script tab strip
-      InspectorPanel.tsx    execution inspector with values / scope / functions tabs
+      InspectorPanel.tsx
+      TabBar.tsx
+      WorkspaceView.tsx
     landing/
-      LandingView.tsx       workspace settings page (global context, bindings, functions)
+      LandingView.tsx
     layout/
-      Header.tsx            top bar with save, import/export, theme toggle
-      Sidebar.tsx           collapsible collections sidebar
-      SidebarTree.tsx       recursive folder/script tree
-      ContextMenu.tsx       right-click context menu
+      ContextMenu.tsx
+      Header.tsx
+      Sidebar.tsx
+      SidebarTree.tsx
     modals/
-      AddModal.tsx          create collection or script
-      RenameModal.tsx       rename any node
-      DeleteModal.tsx       delete with cascade count warning
-      ValueInspectorModal.tsx  read-only value detail view
-      index.tsx             renders all four modals
+      AddModal.tsx
+      DeleteModal.tsx
+      RenameModal.tsx
+      ValueInspectorModal.tsx
+      index.tsx
     ui/
-      CodeMirrorEditor.tsx  CodeMirror 6 wrapper (uncontrolled, stable callback refs)
+      CodeMirrorEditor.tsx
   hooks/
-    useExecution.ts         JSONata evaluation, run status, and inspector state
-    usePersistence.ts       file linking, auto-save, import/export (File System Access API + IndexedDB)
-    useResizablePanels.ts   drag-to-resize panel layout
-    useSidebar.ts           sidebar open/collapse with hover-to-reveal
+    useExecution.ts
+    usePersistence.ts
+    useResizablePanels.ts
+    useSidebar.ts
   lib/
-    codemirror.ts           CM6 extensions — JSON, JSONata, JS modes, autocomplete, hover, folding
-    customFunctions.ts      custom function parsing and JSONata registration
-    helpers.ts              uid, JSON parsing, error location formatting, expression utilities
-    workspace.ts            pure workspace DB helpers (tree queries, normalization)
+    codemirror.ts
+    customFunctions.ts
+    helpers.ts
+    workspace.ts
   store/
-    appContext.tsx           useReducer state, Context provider, typed action union
+    appContext.tsx
+  styles/
+    global.css
+    shell.css
+    ui.css
   types/
-    workspace.ts            shared TypeScript interfaces and discriminated union types
-  workbench/
-    styles.css              all app styles
+    workspace.ts
+public/
+  jsonata-demo-workspace.json
+.github/workflows/
+  build-and-deploy.yml
 ```
 
-### Demo Workspace
+### Notes On The Current Structure
 
-- [public/jsonata-demo-workspace.json](public/jsonata-demo-workspace.json)
+- The app is fully React-based now.
+- The previous monolithic workbench stylesheet has been split into:
+  - `src/styles/global.css`
+  - `src/styles/shell.css`
+  - `src/styles/ui.css`
+- Editor/runtime behavior is split into hooks and utility modules instead of one large browser script.
+
+## Demo Workspace
+
+- [public/jsonata-demo-workspace.json](/Users/namanagarwal/Code/Jsonata%20Collections/public/jsonata-demo-workspace.json)
 
 The app loads the demo workspace by default when no linked workspace file is available.
 
@@ -212,13 +243,13 @@ Vite writes the production app to:
 
 - `dist/`
 
-That output is a static frontend build suitable for GitHub Pages.
+That output is a static frontend build suitable for GitHub Pages or any static hosting.
 
 ## Deployment
 
 This repo includes a GitHub Actions workflow:
 
-- [.github/workflows/build-and-deploy.yml](.github/workflows/build-and-deploy.yml)
+- [.github/workflows/build-and-deploy.yml](/Users/namanagarwal/Code/Jsonata%20Collections/.github/workflows/build-and-deploy.yml)
 
 On pushes to `main`, it:
 
@@ -265,7 +296,8 @@ Without it, the core app still works, but linked file save behavior is limited.
 
 ## Known Technical Debt
 
-- the `CodeMirror` bundle is still relatively large
+- the `CodeMirror` chunk is still relatively large
+- execution context building still does extra work after each run
 - there is currently no automated smoke-test suite
 
 ## License
