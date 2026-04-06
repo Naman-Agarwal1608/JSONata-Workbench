@@ -3,13 +3,15 @@ import { AppProvider, createInitialState, reducer, THEME_KEY } from '../store/ap
 import { usePersistence } from '../hooks/usePersistence'
 import { useSidebar } from '../hooks/useSidebar'
 import { normalizeDB, hasWorkspaceContent } from '../lib/workspace'
-import { Header } from './Header'
-import { Sidebar } from './Sidebar'
-import { ContextMenu } from './ContextMenu'
-import { Modals } from './Modals'
-import { LandingView } from './LandingView'
-import { WorkspaceView } from './WorkspaceView'
-import '../workbench/styles.css'
+import { Header } from './layout/Header'
+import { Sidebar } from './layout/Sidebar'
+import { ContextMenu } from './layout/ContextMenu'
+import { Modals } from './modals'
+import { LandingView } from './landing/LandingView'
+import { WorkspaceView } from './editor/WorkspaceView'
+import '../styles/global.css'
+import '../styles/shell.css'
+import '../styles/ui.css'
 
 function WorkbenchInner() {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState)
@@ -41,6 +43,22 @@ function WorkbenchInner() {
     try { localStorage.setItem(THEME_KEY, state.theme) } catch { /* ignore */ }
   }, [state.theme])
 
+  // Toggle landing scroll mode on html/body
+  useEffect(() => {
+    const cls = 'workbench-landing-mode'
+    if (!state.activeId) {
+      document.documentElement.classList.add(cls)
+      document.body.classList.add(cls)
+    } else {
+      document.documentElement.classList.remove(cls)
+      document.body.classList.remove(cls)
+    }
+    return () => {
+      document.documentElement.classList.remove(cls)
+      document.body.classList.remove(cls)
+    }
+  }, [state.activeId])
+
   // Boot persistence on mount
   useEffect(() => {
     persistence.bootPersistence()
@@ -59,11 +77,9 @@ function WorkbenchInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const isLanding = !state.activeId
-
   return (
     <AppProvider state={state} dispatch={dispatch} persistence={persistence} initialState={state}>
-      <div className={`workbench-host${sidebarOpen ? ' sidebar-auto-open' : ''}${isLanding ? ' landing-mode' : ''}`}>
+      <div className={`workbench-host${sidebarOpen ? ' sidebar-auto-open' : ''}${!state.activeId ? ' landing-mode' : ''}`}>
         <Header />
 
         <div className="ws">
@@ -85,23 +101,11 @@ function WorkbenchInner() {
             onMouseLeave={onSidebarLeave}
           />
 
-          <div className={`main${isLanding ? ' main-landing' : ' main-workspace'}`} id="main">
-            {isLanding ? (
-              <LandingView />
-            ) : state.activeId ? (
+          <div className={`main${!state.activeId ? ' main-landing' : ' main-workspace'}`} id="main">
+            {state.activeId ? (
               <WorkspaceView key={state.activeId} />
             ) : (
-              <div className="empty-s">
-                <div className="eg">◈</div>
-                <h2>Nothing open</h2>
-                <p>Create a collection then add scripts inside it.</p>
-                <button
-                  className="hbtn prim"
-                  onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'folder', parentId: null })}
-                >
-                  New Collection
-                </button>
-              </div>
+              <LandingView />
             )}
           </div>
         </div>

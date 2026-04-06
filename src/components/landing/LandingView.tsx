@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
-import { CodeMirrorEditor } from './CodeMirrorEditor'
-import { useAppContext } from '../store/appContext'
-import { parseJSONText } from '../lib/helpers'
-import { parseCustomFunctions } from '../lib/customFunctions'
-import { setEditorErrorLocation } from '../lib/codemirror'
-import type { EditorView } from '../lib/codemirror'
+import { CodeMirrorEditor } from '../ui/CodeMirrorEditor'
+import { useAppContext } from '../../store/appContext'
+import './LandingView.css'
+import { parseJSONText } from '../../lib/helpers'
+import { parseCustomFunctions } from '../../lib/customFunctions'
+import { setEditorErrorLocation } from '../../lib/codemirror'
+import type { EditorView } from '../../lib/codemirror'
 
 export function LandingView() {
-  const { state, dispatch, schedSave } = useAppContext()
-  const { theme, db } = state
+  const { state, dispatch, schedSave, importFile } = useAppContext()
+  const { theme, db, dbEpoch } = state
   const settings = db.settings
 
   const functionsEditorRef = useRef<EditorView | null>(null)
@@ -58,7 +59,7 @@ export function LandingView() {
             >
               New Collection
             </button>
-            <button className="hbtn" onClick={() => { /* importFile handled in WorkbenchApp */ document.getElementById('import-trigger')?.click() }}>
+            <button className="hbtn" onClick={importFile}>
               Import Workspace
             </button>
           </div>
@@ -80,7 +81,7 @@ export function LandingView() {
               </div>
               <div className="cm-wrap">
                 <CodeMirrorEditor
-                  key={`ctx-${theme}`}
+                  key={`ctx-${theme}-${dbEpoch}`}
                   initialValue={settings.globalContext}
                   mode="json"
                   theme={theme}
@@ -111,7 +112,7 @@ export function LandingView() {
               </div>
               <div className="cm-wrap">
                 <CodeMirrorEditor
-                  key={`bindings-${theme}`}
+                  key={`bindings-${theme}-${dbEpoch}`}
                   initialValue={settings.bindings}
                   mode="json"
                   theme={theme}
@@ -143,7 +144,7 @@ export function LandingView() {
             </div>
             <div className="cm-wrap">
               <CodeMirrorEditor
-                key={`functions-${theme}`}
+                key={`functions-${theme}-${dbEpoch}`}
                 initialValue={settings.customFunctions}
                 mode="javascript"
                 withErrorMarkers

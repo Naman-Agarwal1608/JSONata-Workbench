@@ -1,0 +1,183 @@
+.editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.etoolbar {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 38px;
+  gap: 8px;
+  background: var(--surf2);
+  border-bottom: 1px solid var(--bdr);
+  flex-shrink: 0;
+}
+
+.ename {
+  background: none;
+  border: none;
+  color: var(--tx);
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.ename::placeholder {
+  color: var(--tx3);
+}
+
+.bctag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--tx3);
+  background: var(--surf3);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Three-panel layout */
+.panels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panels-top {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Resize handles */
+.rsz-h {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--bdr);
+  cursor: col-resize;
+  transition: background .15s;
+  z-index: 1;
+}
+
+.rsz-h:hover,
+.rsz-h.dragging {
+  background: var(--acc);
+}
+
+.rsz-v {
+  height: 4px;
+  flex-shrink: 0;
+  background: var(--bdr);
+  cursor: row-resize;
+  transition: background .15s;
+  z-index: 1;
+}
+
+.rsz-v:hover,
+.rsz-v.dragging {
+  background: var(--acc);
+}
+
+/* Input JSON panel toolbar */
+.jtoolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--surf);
+  border-bottom: 1px solid var(--bdr);
+  flex-shrink: 0;
+}
+
+.jbtn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 3px;
+  border: 1px solid var(--bdr2);
+  background: none;
+  color: var(--tx2);
+  cursor: pointer;
+  transition: all .12s;
+  font-family: var(--ui);
+}
+
+.jbtn:hover {
+  color: var(--tx);
+  border-color: var(--tx3);
+}
+
+.jerr {
+  font-size: 10px;
+  color: var(--err);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* Output panel */
+.outview {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.72;
+  padding: 12px 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ok);
+}
+
+.outview.err {
+  color: var(--err);
+}
+
+.outview.empty {
+  color: var(--tx3);
+  font-style: italic;
+  font-family: var(--ui);
+  font-size: 12px;
+}
+
+/* Status bar */
+.sbar {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 14px;
+  background: var(--surf);
+  border-top: 1px solid var(--bdr);
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--tx3);
+}
+
+.sbar .ok {
+  color: var(--ok);
+}
+
+.sbar .err {
+  color: var(--err);
+}

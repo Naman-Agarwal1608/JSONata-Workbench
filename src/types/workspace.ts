@@ -66,3 +66,8 @@ export interface InspectEntry {
   value: unknown
   meta?: string
 }
+
+export type RunStatus =
+  | { kind: 'idle' }
+  | { kind: 'ok'; text: string }
+  | { kind: 'err'; text: string }

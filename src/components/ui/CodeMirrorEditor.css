@@ -1,0 +1,213 @@
+/* CodeMirror 6 container and all editor overrides */
+
+.cm-wrap {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cm-wrap .cm-editor {
+  flex: 1;
+  min-height: 0;
+  background: var(--bg) !important;
+  outline: none !important;
+  cursor: text !important;
+}
+
+.cm-wrap .cm-scroller {
+  flex: 1 !important;
+  height: auto !important;
+  overflow: auto !important;
+  min-height: 0 !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 12.5px !important;
+  line-height: 1.72 !important;
+  cursor: text !important;
+}
+
+.cm-wrap .cm-content,
+.cm-wrap .cm-line {
+  cursor: text !important;
+}
+
+.cm-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--tx3);
+  font-style: italic;
+  font-family: var(--ui);
+}
+
+/* Gutters */
+.cm-wrap .cm-gutters {
+  background: var(--surf2) !important;
+  border-right: 1px solid var(--bdr) !important;
+  color: var(--tx3) !important;
+  cursor: default !important;
+}
+
+.cm-wrap .cm-lineNumbers .cm-gutterElement {
+  padding: 0 8px 0 6px;
+  min-width: 2.6em;
+  text-align: right;
+  cursor: default !important;
+}
+
+.cm-wrap .cm-foldGutter .cm-gutterElement {
+  cursor: pointer !important;
+}
+
+.cm-wrap .cm-activeLineGutter {
+  background: rgba(232, 184, 75, .06) !important;
+}
+
+/* Active / error line highlights */
+.cm-wrap .cm-activeLine {
+  background: rgba(255, 255, 255, .018) !important;
+}
+
+.cm-wrap .cm-errLine {
+  background: rgba(224, 82, 82, .09) !important;
+}
+
+.cm-wrap .cm-errLine .cm-selectionBackground {
+  background: rgba(224, 82, 82, .16) !important;
+}
+
+.cm-wrap .cm-gutterElement.cm-errGutter {
+  color: var(--err) !important;
+  font-weight: 700;
+}
+
+/* Fold summary pill */
+.cm-foldSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--bdr2);
+  border-radius: 999px;
+  background: rgba(123, 132, 153, .12);
+  color: var(--tx2);
+  font-size: 11px;
+  line-height: 1.6;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cm-foldSummary:hover {
+  color: var(--tx);
+  border-color: var(--tx3);
+  background: rgba(123, 132, 153, .18);
+}
+
+.cm-foldSummary strong {
+  color: var(--tx);
+}
+
+/* Cursor and selection */
+.cm-wrap .cm-cursor {
+  border-left-color: var(--acc) !important;
+}
+
+.cm-wrap .cm-selectionBackground,
+.cm-wrap .cm-editor.cm-focused .cm-selectionBackground {
+  background: rgba(91, 156, 246, .22) !important;
+}
+
+/* Search / replace panel */
+.cm-wrap .cm-panels {
+  background: var(--surf2) !important;
+  border-color: var(--bdr) !important;
+  color: var(--tx) !important;
+}
+
+.cm-wrap .cm-panels-bottom {
+  border-top: 1px solid var(--bdr) !important;
+}
+
+.cm-wrap .cm-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px 8px !important;
+  align-items: center;
+}
+
+.cm-wrap .cm-search input {
+  background: var(--bg) !important;
+  border: 1px solid var(--bdr2) !important;
+  color: var(--tx) !important;
+  border-radius: 4px !important;
+  padding: 2px 7px !important;
+  font-family: var(--mono) !important;
+  font-size: 11px !important;
+  outline: none !important;
+}
+
+.cm-wrap .cm-search input:focus {
+  border-color: var(--acc) !important;
+}
+
+.cm-wrap .cm-search label {
+  color: var(--tx2) !important;
+  font-size: 11px !important;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cm-wrap .cm-search button {
+  background: var(--surf3) !important;
+  border: 1px solid var(--bdr2) !important;
+  color: var(--tx2) !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  font-size: 11px !important;
+  padding: 2px 7px !important;
+}
+
+.cm-wrap .cm-search button:hover {
+  color: var(--tx) !important;
+  border-color: var(--acc) !important;
+}
+
+.cm-wrap .cm-textfield {
+  background: var(--bg) !important;
+  border: 1px solid var(--bdr2) !important;
+  color: var(--tx) !important;
+  border-radius: 4px !important;
+}
+
+/* Hover tooltip */
+.cm-tooltip {
+  background: var(--surf2) !important;
+  border: 1px solid var(--bdr2) !important;
+  border-radius: 7px !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .45) !important;
+  padding: 0 !important;
+}
+
+.cm-fn-tooltip {
+  padding: 8px 12px;
+  max-width: 340px;
+}
+
+.cm-fn-tt-sig {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--acc);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.cm-fn-tt-info {
+  font-size: 11px;
+  color: var(--tx2);
+  line-height: 1.55;
+}

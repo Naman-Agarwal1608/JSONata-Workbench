@@ -19,6 +19,7 @@ export type CtxMenu = { id: string; x: number; y: number } | null
 // ── APP STATE ────────────────────────────────────────────────────
 export interface AppState {
   db: WorkspaceDB
+  dbEpoch: number          // increments on every SET_DB, used to remount landing editors
   activeId: string | null
   tabs: string[]
   theme: 'dark' | 'light'
@@ -59,7 +60,7 @@ function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
 
     case 'SET_DB':
-      return { ...state, db: action.db }
+      return { ...state, db: action.db, dbEpoch: state.dbEpoch + 1 }
 
     case 'RESET_VIEW_STATE':
       return { ...state, activeId: null, tabs: [], modal: { kind: 'none' }, ctxMenu: null }
@@ -222,6 +223,7 @@ function getInitialTheme(): 'dark' | 'light' {
 export function createInitialState(): AppState {
   return {
     db: normalizeDB(),
+    dbEpoch: 0,
     activeId: null,
     tabs: [],
     theme: getInitialTheme(),

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import jsonata from 'jsonata'
 import type { Dispatch } from 'react'
 import type { AppAction } from '../store/appContext'
-import type { ExecContext, InspectEntry, WorkspaceDB, WorkspaceNode } from '../types/workspace'
+import type { ExecContext, InspectEntry, RunStatus, WorkspaceDB, WorkspaceNode } from '../types/workspace'
 import type { EditorView } from '../lib/codemirror'
 import { setEditorErrorLocation, clearEditorErrorLocation } from '../lib/codemirror'
 import { parseJSONText, summariseValue, getExpressionSnippet, getJsonataErrorLocation, formatErrorLocation, splitTopLevelStatements, uid } from '../lib/helpers'
@@ -20,8 +20,7 @@ interface UseExecutionOptions {
 export interface ExecutionResult {
   outputText: string
   outputState: 'ok' | 'err' | 'empty'
-  runBadgeState: string
-  runBadgeText: string
+  runStatus: RunStatus
   execCtx: ExecContext | null
   execCtxExpanded: boolean
   execCtxTab: 'values' | 'scope' | 'functions'
@@ -86,8 +85,7 @@ async function buildExecutionContext({
 export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef }: UseExecutionOptions): ExecutionResult {
   const [outputText, setOutputText] = useState('Run the expression to see results…')
   const [outputState, setOutputState] = useState<'ok' | 'err' | 'empty'>('empty')
-  const [runBadgeState, setRunBadgeState] = useState('')
-  const [runBadgeText, setRunBadgeText] = useState('Ready')
+  const [runStatus, setRunStatus] = useState<RunStatus>({ kind: 'idle' })
   const [execCtx, setExecCtx] = useState<ExecContext | null>(null)
   const [execCtxExpanded, setExecCtxExpanded] = useState(false)
   const [execCtxTab, setExecCtxTabState] = useState<'values' | 'scope' | 'functions'>('values')
@@ -99,11 +97,6 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
   const dbRef = useRef(db)
   useEffect(() => { nodeRef.current = node }, [node])
   useEffect(() => { dbRef.current = db }, [db])
-
-  function setRunBadges(state: string, text: string) {
-    setRunBadgeState(state)
-    setRunBadgeText(text)
-  }
 
   function setOutput(text: string, state: 'ok' | 'err' | 'empty') {
     setOutputText(text)
@@ -118,7 +111,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
     if (!expr) {
       clearEditorErrorLocation(exprView)
       setOutput('Enter an expression in the middle panel…', 'empty')
-      setRunBadges('', 'Ready')
+      setRunStatus({ kind: 'idle' })
       setExecCtx(null)
       return
     }
@@ -130,7 +123,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
       setOutput(bindingsResult.message ?? 'Invalid bindings', 'err')
       setExecCtxExpanded(true)
       buildExecutionContext({ expr, bindings: {}, customFns: [], error: new Error(bindingsResult.message) }).then(ctx => setExecCtx(ctx))
-      setRunBadges('err', '✗ Invalid bindings')
+      setRunStatus({ kind: 'err', text: '✗ Invalid bindings' })
       return
     }
 
@@ -149,7 +142,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
         setOutput(msg, 'err')
         setExecCtxExpanded(true)
         buildExecutionContext({ expr, bindings: bindingsResult.value as Record<string, unknown>, customFns, functionsError: functionsResult, error: new Error(msg) }).then(ctx => setExecCtx(ctx))
-        setRunBadges('err', `✗ Invalid ${sourceLabel.toLowerCase()}`)
+        setRunStatus({ kind: 'err', text: `✗ Invalid ${sourceLabel.toLowerCase()}` })
         return
       }
     }
@@ -162,7 +155,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
       clearEditorErrorLocation(exprView)
       setOutput(out, 'ok')
       const warn = !functionsResult.ok ? ' · custom functions ignored' : ''
-      setRunBadges('ok', '✓ OK · ' + new Date().toLocaleTimeString() + warn)
+      setRunStatus({ kind: 'ok', text: '✓ OK · ' + new Date().toLocaleTimeString() + warn })
       buildExecutionContext({
         expr, data, bindings: bindingsResult.value as Record<string, unknown>,
         customFns, functionsError: functionsResult, resultValue: result,
@@ -191,7 +184,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
           setInspectEntries(buildInspectEntries(ctx))
         }
       })
-      setRunBadges('err', '✗ ' + (msg || 'Error'))
+      setRunStatus({ kind: 'err', text: '✗ ' + (msg || 'Error') })
     }
   }
 
@@ -238,7 +231,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
   }, [execCtx])
 
   return {
-    outputText, outputState, runBadgeState, runBadgeText,
+    outputText, outputState, runStatus,
     execCtx, execCtxExpanded, execCtxTab, inspectEntries,
     run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue,
   }

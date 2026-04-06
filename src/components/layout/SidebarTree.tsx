@@ -1,6 +1,7 @@
-import { useAppContext } from '../store/appContext'
-import { kids, folderColor } from '../lib/workspace'
-import type { WorkspaceNode } from '../types/workspace'
+import { useAppContext } from '../../store/appContext'
+import { kids, folderColor } from '../../lib/workspace'
+import type { WorkspaceNode } from '../../types/workspace'
+import './SidebarTree.css'
 
 export function SidebarTree() {
   const { state } = useAppContext()

@@ -2,7 +2,7 @@
 
 `JSONata Workbench` is a local-first JSONata workspace for writing, organizing, and testing JSONata expressions against shared or per-script JSON input.
 
-It started as a single standalone HTML file and now runs as a small `Vue 3 + Vite + TypeScript` project, while keeping the same browser-based workbench feel.
+It runs as a `React 18 + Vite + TypeScript` app with a browser-based workbench feel and no backend required.
 
 ## What It Does
 
@@ -133,57 +133,50 @@ $formatMoney(19.99, $currency)
 
 ## Project Structure
 
-### App Shell
-
-- [src/App.vue](/Users/namanagarwal/Code/Jsonata%20Collections/src/App.vue)
-- [src/components/WorkbenchApp.vue](/Users/namanagarwal/Code/Jsonata%20Collections/src/components/WorkbenchApp.vue)
-
-The Vue app shell mounts the workbench, provides the header/layout shell, and owns the sidebar collapse interaction.
-
-### Workbench Runtime Modules
-
-- [src/workbench/runtime.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/runtime.js)
-  Composition root for workbench state, controller wiring, and boot/cleanup
-
-- [src/workbench/helpers.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/helpers.js)
-  Shared utility helpers
-
-- [src/workbench/workspace.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/workspace.js)
-  Workspace normalization and tree/data helpers
-
-- [src/workbench/custom-functions.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/custom-functions.js)
-  Custom function parsing and registration
-
-- [src/workbench/templates.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/templates.js)
-  Main HTML template renderers
-
-- [src/workbench/codemirror.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/codemirror.js)
-  CodeMirror bootstrap, autocomplete, hover, and folding bridge
-
-- [src/workbench/editors.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/editors.js)
-  Editor creation, landing editors, output rendering, and input/expression editor flow
-
-- [src/workbench/execution.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/execution.js)
-  Expression execution and inspector context building
-
-- [src/workbench/persistence.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/persistence.js)
-  File linking, save, export, import, and boot persistence
-
-- [src/workbench/tree.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/tree.js)
-  Sidebar tree and tab behavior
-
-- [src/workbench/modals.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/modals.js)
-  Add/rename/delete dialogs and context menu actions
-
-- [src/workbench/layout.js](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/layout.js)
-  Resizable panel layout behavior
-
-- [src/workbench/styles.css](/Users/namanagarwal/Code/Jsonata%20Collections/src/workbench/styles.css)
-  Main workbench styling
+```
+src/
+  components/
+    WorkbenchApp.tsx        root component, mounts providers and layout shell
+    editor/
+      WorkspaceView.tsx     three-panel script editor (input / expression / output)
+      TabBar.tsx            open-script tab strip
+      InspectorPanel.tsx    execution inspector with values / scope / functions tabs
+    landing/
+      LandingView.tsx       workspace settings page (global context, bindings, functions)
+    layout/
+      Header.tsx            top bar with save, import/export, theme toggle
+      Sidebar.tsx           collapsible collections sidebar
+      SidebarTree.tsx       recursive folder/script tree
+      ContextMenu.tsx       right-click context menu
+    modals/
+      AddModal.tsx          create collection or script
+      RenameModal.tsx       rename any node
+      DeleteModal.tsx       delete with cascade count warning
+      ValueInspectorModal.tsx  read-only value detail view
+      index.tsx             renders all four modals
+    ui/
+      CodeMirrorEditor.tsx  CodeMirror 6 wrapper (uncontrolled, stable callback refs)
+  hooks/
+    useExecution.ts         JSONata evaluation, run status, and inspector state
+    usePersistence.ts       file linking, auto-save, import/export (File System Access API + IndexedDB)
+    useResizablePanels.ts   drag-to-resize panel layout
+    useSidebar.ts           sidebar open/collapse with hover-to-reveal
+  lib/
+    codemirror.ts           CM6 extensions — JSON, JSONata, JS modes, autocomplete, hover, folding
+    customFunctions.ts      custom function parsing and JSONata registration
+    helpers.ts              uid, JSON parsing, error location formatting, expression utilities
+    workspace.ts            pure workspace DB helpers (tree queries, normalization)
+  store/
+    appContext.tsx           useReducer state, Context provider, typed action union
+  types/
+    workspace.ts            shared TypeScript interfaces and discriminated union types
+  workbench/
+    styles.css              all app styles
+```
 
 ### Demo Workspace
 
-- [public/jsonata-demo-workspace.json](/Users/namanagarwal/Code/Jsonata%20Collections/public/jsonata-demo-workspace.json)
+- [public/jsonata-demo-workspace.json](public/jsonata-demo-workspace.json)
 
 The app loads the demo workspace by default when no linked workspace file is available.
 
@@ -225,7 +218,7 @@ That output is a static frontend build suitable for GitHub Pages.
 
 This repo includes a GitHub Actions workflow:
 
-- [.github/workflows/build-and-deploy.yml](/Users/namanagarwal/Code/Jsonata%20Collections/.github/workflows/build-and-deploy.yml)
+- [.github/workflows/build-and-deploy.yml](.github/workflows/build-and-deploy.yml)
 
 On pushes to `main`, it:
 
@@ -248,7 +241,7 @@ After that, pushes to `main` should deploy automatically.
 
 Main runtime dependencies:
 
-- `vue`
+- `react`, `react-dom`
 - `jsonata`
 - `@jsonhero/codemirror-lang-jsonata`
 - `@codemirror/*`
@@ -256,7 +249,7 @@ Main runtime dependencies:
 Build/dev dependencies:
 
 - `vite`
-- `@vitejs/plugin-vue`
+- `@vitejs/plugin-react`
 - `typescript`
 
 ## Browser Notes
@@ -270,16 +263,9 @@ That flow depends on the File System Access API.
 
 Without it, the core app still works, but linked file save behavior is limited.
 
-## Current State
-
-The project is no longer in a “legacy iframe migration” stage. The Vue/Vite app is the real application, and the original monolithic workbench logic has already been split into smaller source modules.
-
-The remaining work, if any, is normal product or architecture work rather than migration.
-
 ## Known Technical Debt
 
 - the `CodeMirror` bundle is still relatively large
-- the workbench runtime still uses an imperative DOM-driven model internally
 - there is currently no automated smoke-test suite
 
 ## License

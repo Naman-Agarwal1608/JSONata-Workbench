@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import { CodeMirrorEditor } from './CodeMirrorEditor'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CodeMirrorEditor } from '../ui/CodeMirrorEditor'
 import { TabBar } from './TabBar'
 import { InspectorPanel } from './InspectorPanel'
-import { useAppContext } from '../store/appContext'
-import { useExecution } from '../hooks/useExecution'
-import { useResizablePanels } from '../hooks/useResizablePanels'
-import { breadcrumb, findNode } from '../lib/workspace'
-import { parseCustomFunctions } from '../lib/customFunctions'
-import type { EditorView } from '../lib/codemirror'
+import './WorkspaceView.css'
+import { useAppContext } from '../../store/appContext'
+import { useExecution } from '../../hooks/useExecution'
+import { useResizablePanels } from '../../hooks/useResizablePanels'
+import { breadcrumb, findNode } from '../../lib/workspace'
+import { parseCustomFunctions } from '../../lib/customFunctions'
+import type { EditorView } from '../../lib/codemirror'
 
 export function WorkspaceView() {
   const { state, dispatch, schedSave } = useAppContext()
@@ -21,17 +22,17 @@ export function WorkspaceView() {
 
   const execution = useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef })
   const {
-    outputText, outputState, runBadgeState, runBadgeText,
+    outputText, outputState, runStatus,
     execCtx, execCtxExpanded, execCtxTab, inspectEntries,
     run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue,
   } = execution
 
   const [jsonErr, setJsonErr] = useState('')
 
-  function getCustomFunctionEntries() {
+  const getCustomFunctionEntries = useCallback(() => {
     const result = parseCustomFunctions(db.settings.customFunctions || '')
     return result.ok ? (result.value ?? []) : []
-  }
+  }, [db.settings.customFunctions])
 
   function handleInputUpdate(val: string) {
     dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'input', value: val })
@@ -85,6 +86,10 @@ export function WorkspaceView() {
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [run])
+
+  const badgeClass = runStatus.kind !== 'idle' ? runStatus.kind : ''
+  const badgeText = runStatus.kind !== 'idle' ? runStatus.text : ''
+  const statusText = runStatus.kind !== 'idle' ? runStatus.text : 'Ready'
 
   return (
     <>
@@ -141,11 +146,8 @@ export function WorkspaceView() {
             <div className="panel" id="panelExpr" style={{ flexGrow: 100 - rszLeft, flexShrink: 1, flexBasis: 0 }}>
               <div className="phead">
                 <span className="ptitle">Expression</span>
-                {runBadgeState && (
-                  <span
-                    className={`pbadge${runBadgeState ? ' ' + runBadgeState : ''}`}
-                    dangerouslySetInnerHTML={{ __html: runBadgeText }}
-                  />
+                {badgeClass && (
+                  <span className={`pbadge ${badgeClass}`}>{badgeText}</span>
                 )}
               </div>
               <div className="cm-wrap">
@@ -172,11 +174,8 @@ export function WorkspaceView() {
           >
             <div className="phead">
               <span className="ptitle">Output</span>
-              {runBadgeState && (
-                <span
-                  className={`pbadge${runBadgeState ? ' ' + runBadgeState : ''}`}
-                  dangerouslySetInnerHTML={{ __html: runBadgeText }}
-                />
+              {badgeClass && (
+                <span className={`pbadge ${badgeClass}`}>{badgeText}</span>
               )}
             </div>
 
@@ -210,7 +209,7 @@ export function WorkspaceView() {
         </div>
 
         <div className="sbar">
-          <span>{runBadgeText}</span>
+          <span>{statusText}</span>
         </div>
       </div>
     </>

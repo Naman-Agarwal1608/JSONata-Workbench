@@ -1,4 +1,5 @@
-import { useAppContext } from '../store/appContext'
+import { useAppContext } from '../../store/appContext'
+import './Header.css'
 
 export function Header() {
   const { state, dispatch, pickFile, saveNow, exportFile, importFile } = useAppContext()

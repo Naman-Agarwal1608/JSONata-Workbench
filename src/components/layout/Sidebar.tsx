@@ -1,5 +1,6 @@
-import { useAppContext } from '../store/appContext'
+import { useAppContext } from '../../store/appContext'
 import { SidebarTree } from './SidebarTree'
+import './Sidebar.css'
 
 interface SidebarProps {
   collapsed: boolean

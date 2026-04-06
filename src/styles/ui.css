@@ -1,0 +1,74 @@
+/* Shared UI primitives used across multiple components */
+
+/* Button — used in Header, WorkspaceView, LandingView, Modals */
+.hbtn {
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid var(--bdr2);
+  background: none;
+  color: var(--tx2);
+  transition: all .13s;
+  white-space: nowrap;
+}
+
+.hbtn:hover {
+  color: var(--tx);
+  border-color: var(--tx3);
+  background: var(--surf2);
+}
+
+.hbtn.prim {
+  background: var(--acc);
+  color: #111;
+  border-color: var(--acc);
+  font-weight: 600;
+}
+
+.hbtn.prim:hover {
+  background: var(--acc2);
+}
+
+/* Panel header — used in WorkspaceView panels and LandingView editor panels */
+.phead {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--surf2);
+  border-bottom: 1px solid var(--bdr);
+  gap: 8px;
+}
+
+.ptitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--tx3);
+  flex: 1;
+}
+
+.pbadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  padding: 1px 7px;
+  border-radius: 2px;
+  background: var(--surf3);
+  color: var(--tx3);
+}
+
+.pbadge.ok {
+  background: rgba(77, 184, 135, .15);
+  color: var(--ok);
+}
+
+.pbadge.err {
+  background: rgba(224, 82, 82, .15);
+  color: var(--err);
+}

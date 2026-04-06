@@ -1,5 +1,6 @@
-import type { ExecContext, InspectEntry } from '../types/workspace'
-import { summariseValue, esc } from '../lib/helpers'
+import type { ExecContext, InspectEntry } from '../../types/workspace'
+import { summariseValue, esc } from '../../lib/helpers'
+import './InspectorPanel.css'
 
 interface InspectorPanelProps {
   execCtx: ExecContext | null

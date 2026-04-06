@@ -1,0 +1,64 @@
+.hdr {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--surf);
+  border-bottom: 1px solid var(--bdr);
+  gap: 10px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--acc);
+  cursor: pointer;
+  user-select: none;
+}
+
+.logo-mark {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.logo span {
+  color: var(--tx3);
+  font-weight: 400;
+}
+
+.hgap {
+  flex: 1;
+}
+
+.spill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--tx3);
+}
+
+.sdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tx3);
+  transition: background .3s;
+  flex-shrink: 0;
+}
+
+.sdot.ok {
+  background: var(--ok);
+}
+
+.sdot.busy {
+  background: var(--warn);
+}

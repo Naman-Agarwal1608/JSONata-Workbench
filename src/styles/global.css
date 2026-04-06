@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #111214;
+  --surf: #18191d;
+  --surf2: #1e2026;
+  --surf3: #24262e;
+  --bdr: #2c2f38;
+  --bdr2: #383c48;
+  --acc: #e8b84b;
+  --acc2: #d4a43a;
+  --tx: #dde1ec;
+  --tx2: #7b8499;
+  --tx3: #454c60;
+  --ok: #4db887;
+  --err: #e05252;
+  --warn: #e08040;
+  --blue: #5b9cf6;
+  --purp: #b07ef8;
+  --mono: 'JetBrains Mono', monospace;
+  --ui: 'Inter', sans-serif;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f6fb;
+  --surf: #ffffff;
+  --surf2: #eef2f9;
+  --surf3: #e6ebf5;
+  --bdr: #d7deeb;
+  --bdr2: #c2ccdd;
+  --acc: #d49714;
+  --acc2: #bb830d;
+  --tx: #1c2433;
+  --tx2: #5c6980;
+  --tx3: #90a0ba;
+  --ok: #1f9b69;
+  --err: #c33e3e;
+  --warn: #ca6a1f;
+  --blue: #2f6de1;
+  --purp: #8153d8;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.workbench-landing-mode,
+body.workbench-landing-mode {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}
+
+body {
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--ui);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] body {
+  color-scheme: light;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bdr2);
+  border-radius: 3px;
+}

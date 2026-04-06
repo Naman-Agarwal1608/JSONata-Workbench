@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { EditorView, buildEditorExtensions } from '../lib/codemirror'
-import type { CustomFunctionEntry } from '../types/workspace'
+import { EditorView, buildEditorExtensions } from '../../lib/codemirror'
+import type { CustomFunctionEntry } from '../../types/workspace'
+import './CodeMirrorEditor.css'
 
 interface CodeMirrorEditorProps {
   initialValue?: string
@@ -69,5 +70,5 @@ export function CodeMirrorEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return <div ref={containerRef} />
+  return <div ref={containerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }} />
 }

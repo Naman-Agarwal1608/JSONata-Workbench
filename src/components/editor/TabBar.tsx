@@ -1,5 +1,6 @@
-import { useAppContext } from '../store/appContext'
-import { findNode } from '../lib/workspace'
+import { useAppContext } from '../../store/appContext'
+import { findNode } from '../../lib/workspace'
+import './TabBar.css'
 
 export function TabBar() {
   const { state, dispatch } = useAppContext()

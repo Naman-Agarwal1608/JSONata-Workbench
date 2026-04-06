@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { useAppContext } from '../store/appContext'
-import { findNode } from '../lib/workspace'
+import { useAppContext } from '../../store/appContext'
+import { findNode } from '../../lib/workspace'
+import './ContextMenu.css'
 
 export function ContextMenu() {
   const { state, dispatch } = useAppContext()
