@@ -69,5 +69,6 @@ export interface InspectEntry {
 
 export type RunStatus =
   | { kind: 'idle' }
-  | { kind: 'ok'; text: string }
-  | { kind: 'err'; text: string }
+  | { kind: 'busy'; text: string }
+  | { kind: 'ok'; text: string; durationMs?: number }
+  | { kind: 'err'; text: string; durationMs?: number }

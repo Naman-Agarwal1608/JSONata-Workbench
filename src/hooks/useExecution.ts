@@ -32,6 +32,12 @@ export interface ExecutionResult {
   openInspectValue: (id: string) => void
 }
 
+const AUTO_RUN_DEBOUNCE_MS = 250
+
+function formatDurationMs(ms: number): number {
+  return ms < 10 ? Number(ms.toFixed(2)) : ms < 100 ? Number(ms.toFixed(1)) : Math.round(ms)
+}
+
 async function getVariableSnapshots(
   expr: string,
   loc: { line?: number } | null,
@@ -92,6 +98,8 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
   const [inspectEntries, setInspectEntries] = useState(() => new Map<string, InspectEntry>())
 
   const runTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const execCtxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const execCtxTokenRef = useRef(0)
   // Stable refs so async run() always has the latest
   const nodeRef = useRef(node)
   const dbRef = useRef(db)
@@ -103,9 +111,28 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
     setOutputState(state)
   }
 
+  function scheduleExecutionContext(task: () => Promise<ExecContext>, expr: string): void {
+    execCtxTokenRef.current += 1
+    const token = execCtxTokenRef.current
+    if (execCtxTimerRef.current) clearTimeout(execCtxTimerRef.current)
+    execCtxTimerRef.current = setTimeout(() => {
+      task().then(ctx => {
+        const latestExpr = exprEditorRef.current?.state.doc.toString().trim()
+        if (token === execCtxTokenRef.current && latestExpr && latestExpr === expr) {
+          setExecCtx(ctx)
+          setInspectEntries(buildInspectEntries(ctx))
+        }
+      }).catch(() => { /* ignore */ })
+    }, 0)
+  }
+
   async function run(): Promise<void> {
     const exprView = exprEditorRef.current
     if (!exprView) return
+    if (runTimerRef.current) {
+      clearTimeout(runTimerRef.current)
+      runTimerRef.current = null
+    }
 
     const expr = exprView.state.doc.toString().trim()
     if (!expr) {
@@ -122,7 +149,10 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
       clearEditorErrorLocation(exprView)
       setOutput(bindingsResult.message ?? 'Invalid bindings', 'err')
       setExecCtxExpanded(true)
-      buildExecutionContext({ expr, bindings: {}, customFns: [], error: new Error(bindingsResult.message) }).then(ctx => setExecCtx(ctx))
+      scheduleExecutionContext(
+        () => buildExecutionContext({ expr, bindings: {}, customFns: [], error: new Error(bindingsResult.message) }),
+        expr,
+      )
       setRunStatus({ kind: 'err', text: '✗ Invalid bindings' })
       return
     }
@@ -141,50 +171,53 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
         const msg = sourceLabel + ' error:\n' + (e instanceof Error ? e.message : String(e))
         setOutput(msg, 'err')
         setExecCtxExpanded(true)
-        buildExecutionContext({ expr, bindings: bindingsResult.value as Record<string, unknown>, customFns, functionsError: functionsResult, error: new Error(msg) }).then(ctx => setExecCtx(ctx))
+        scheduleExecutionContext(
+          () => buildExecutionContext({
+            expr, bindings: bindingsResult.value as Record<string, unknown>, customFns, functionsError: functionsResult, error: new Error(msg),
+          }),
+          expr,
+        )
         setRunStatus({ kind: 'err', text: `✗ Invalid ${sourceLabel.toLowerCase()}` })
         return
       }
     }
 
+    const startedAt = performance.now()
+    setRunStatus({ kind: 'busy', text: 'Running…' })
     try {
       const compiled = jsonata(expr)
       registerCustomFunctions(compiled as Parameters<typeof registerCustomFunctions>[0], customFns)
       const result = await compiled.evaluate(data as object, bindingsResult.value as Record<string, unknown>)
+      const durationMs = formatDurationMs(performance.now() - startedAt)
       const out = result === undefined ? '(undefined — expression returned no value)' : JSON.stringify(result, null, 2)
       clearEditorErrorLocation(exprView)
       setOutput(out, 'ok')
       const warn = !functionsResult.ok ? ' · custom functions ignored' : ''
-      setRunStatus({ kind: 'ok', text: '✓ OK · ' + new Date().toLocaleTimeString() + warn })
-      buildExecutionContext({
-        expr, data, bindings: bindingsResult.value as Record<string, unknown>,
-        customFns, functionsError: functionsResult, resultValue: result,
-      }).then(ctx => {
-        const latestExpr = exprEditorRef.current?.state.doc.toString().trim()
-        if (latestExpr && expr === latestExpr) {
-          setExecCtx(ctx)
-          setInspectEntries(buildInspectEntries(ctx))
-        }
-      })
+      setRunStatus({ kind: 'ok', text: '✓ OK' + warn, durationMs })
+      scheduleExecutionContext(
+        () => buildExecutionContext({
+          expr, data, bindings: bindingsResult.value as Record<string, unknown>,
+          customFns, functionsError: functionsResult, resultValue: result,
+        }),
+        expr,
+      )
     } catch (e) {
+      const durationMs = formatDurationMs(performance.now() - startedAt)
       const err = e as Error & { position?: number }
       const loc = getJsonataErrorLocation(err, expr)
       if (loc) setEditorErrorLocation(exprView, loc)
       const msg = (err.message || String(err)) + formatErrorLocation(loc)
       setOutput(msg, 'err')
       setExecCtxExpanded(true)
-      buildExecutionContext({
-        error: err, expr, data, location: loc,
-        bindings: bindingsResult.value as Record<string, unknown>,
-        customFns, functionsError: functionsResult,
-      }).then(ctx => {
-        const latestExpr = exprEditorRef.current?.state.doc.toString().trim()
-        if (latestExpr && expr === latestExpr) {
-          setExecCtx(ctx)
-          setInspectEntries(buildInspectEntries(ctx))
-        }
-      })
-      setRunStatus({ kind: 'err', text: '✗ ' + (msg || 'Error') })
+      scheduleExecutionContext(
+        () => buildExecutionContext({
+          error: err, expr, data, location: loc,
+          bindings: bindingsResult.value as Record<string, unknown>,
+          customFns, functionsError: functionsResult,
+        }),
+        expr,
+      )
+      setRunStatus({ kind: 'err', text: '✗ ' + (msg || 'Error'), durationMs })
     }
   }
 
@@ -201,7 +234,8 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
 
   function scheduleRun(): void {
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
-    runTimerRef.current = setTimeout(run, 600)
+    setRunStatus({ kind: 'busy', text: 'Running…' })
+    runTimerRef.current = setTimeout(run, AUTO_RUN_DEBOUNCE_MS)
   }
 
   function toggleExecCtx(force?: boolean): void {
@@ -221,7 +255,10 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
   // auto-run on mount if there's already content
   useEffect(() => {
     if (node.expr?.trim()) scheduleRun()
-    return () => { if (runTimerRef.current) clearTimeout(runTimerRef.current) }
+    return () => {
+      if (runTimerRef.current) clearTimeout(runTimerRef.current)
+      if (execCtxTimerRef.current) clearTimeout(execCtxTimerRef.current)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

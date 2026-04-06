@@ -90,6 +90,9 @@ export function WorkspaceView() {
   const badgeClass = runStatus.kind !== 'idle' ? runStatus.kind : ''
   const badgeText = runStatus.kind !== 'idle' ? runStatus.text : ''
   const statusText = runStatus.kind !== 'idle' ? runStatus.text : 'Ready'
+  const durationText = runStatus.kind !== 'idle' && typeof runStatus.durationMs === 'number'
+    ? `${runStatus.durationMs} ms`
+    : ''
 
   return (
     <>
@@ -210,6 +213,7 @@ export function WorkspaceView() {
 
         <div className="sbar">
           <span>{statusText}</span>
+          {durationText && <span>{durationText}</span>}
         </div>
       </div>
     </>
