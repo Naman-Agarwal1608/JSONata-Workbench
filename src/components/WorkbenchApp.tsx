@@ -43,22 +43,6 @@ function WorkbenchInner() {
     try { localStorage.setItem(THEME_KEY, state.theme) } catch { /* ignore */ }
   }, [state.theme])
 
-  // Toggle landing scroll mode on html/body
-  useEffect(() => {
-    const cls = 'workbench-landing-mode'
-    if (!state.activeId) {
-      document.documentElement.classList.add(cls)
-      document.body.classList.add(cls)
-    } else {
-      document.documentElement.classList.remove(cls)
-      document.body.classList.remove(cls)
-    }
-    return () => {
-      document.documentElement.classList.remove(cls)
-      document.body.classList.remove(cls)
-    }
-  }, [state.activeId])
-
   // Boot persistence on mount
   useEffect(() => {
     persistence.bootPersistence()
@@ -78,7 +62,7 @@ function WorkbenchInner() {
   }, [])
 
   return (
-    <AppProvider state={state} dispatch={dispatch} persistence={persistence} initialState={state}>
+    <AppProvider state={state} dispatch={dispatch} persistence={persistence}>
       <div className={`workbench-host${sidebarOpen ? ' sidebar-auto-open' : ''}${!state.activeId ? ' landing-mode' : ''}`}>
         <Header />
 

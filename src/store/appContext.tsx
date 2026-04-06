@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, type Dispatch, type ReactNode } from 'react'
 import type { InspectEntry, WorkspaceDB, WorkspaceNode } from '../types/workspace'
 import { normalizeDB, allDescIds } from '../lib/workspace'
 import { uid } from '../lib/helpers'
@@ -30,6 +30,9 @@ export interface AppState {
   ctxMenu: CtxMenu
 }
 
+export type WorkspaceState = Pick<AppState, 'db' | 'dbEpoch'>
+export type UIState = Omit<AppState, keyof WorkspaceState>
+
 // ── ACTIONS ──────────────────────────────────────────────────────
 export type AppAction =
   | { type: 'SET_DB'; db: WorkspaceDB }
@@ -55,29 +58,10 @@ export type AppAction =
   | { type: 'OPEN_CTX_MENU'; id: string; x: number; y: number }
   | { type: 'CLOSE_CTX_MENU' }
 
-// ── REDUCER ──────────────────────────────────────────────────────
-function reducer(state: AppState, action: AppAction): AppState {
+function reduceWorkspaceState(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-
     case 'SET_DB':
       return { ...state, db: action.db, dbEpoch: state.dbEpoch + 1 }
-
-    case 'RESET_VIEW_STATE':
-      return { ...state, activeId: null, tabs: [], modal: { kind: 'none' }, ctxMenu: null }
-
-    case 'OPEN_SCRIPT': {
-      const tabs = state.tabs.includes(action.id) ? state.tabs : [...state.tabs, action.id]
-      return { ...state, activeId: action.id, tabs }
-    }
-
-    case 'CLOSE_TAB': {
-      const tabs = state.tabs.filter(t => t !== action.id)
-      const activeId = state.activeId === action.id ? (tabs[tabs.length - 1] ?? null) : state.activeId
-      return { ...state, tabs, activeId }
-    }
-
-    case 'GO_HOME':
-      return { ...state, activeId: null }
 
     case 'TOGGLE_FOLDER': {
       const nodes = state.db.nodes.map(n => n.id === action.id ? { ...n, open: !n.open } : n)
@@ -85,6 +69,7 @@ function reducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'ADD_NODE': {
+      const siblingCount = state.db.nodes.filter(n => (n.parentId ?? null) === (action.parentId ?? null)).length
       const newNode: WorkspaceNode = {
         id: uid(),
         type: action.nodeType,
@@ -94,15 +79,19 @@ function reducer(state: AppState, action: AppAction): AppState {
         open: true,
         expr: '',
         input: '',
-        order: state.db.nodes.filter(n => (n.parentId ?? null) === (action.parentId ?? null)).length,
+        order: siblingCount,
       }
-      // auto-open parent folders
+
       let pid = action.parentId
       const nodes = state.db.nodes.map(n => {
-        if (n.id === pid) { pid = n.parentId; return { ...n, open: true } }
+        if (n.id === pid) {
+          pid = n.parentId
+          return { ...n, open: true }
+        }
         return n
       })
       nodes.push(newNode)
+
       const nextState = { ...state, db: { ...state.db, nodes }, modal: { kind: 'none' } as ModalState }
       if (action.nodeType === 'script') {
         return { ...nextState, activeId: newNode.id, tabs: [...state.tabs, newNode.id] }
@@ -133,6 +122,30 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, db: { ...state.db, settings } }
     }
 
+    default:
+      return state
+  }
+}
+
+function reduceUIState(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
+    case 'RESET_VIEW_STATE':
+      return { ...state, activeId: null, tabs: [], modal: { kind: 'none' }, ctxMenu: null }
+
+    case 'OPEN_SCRIPT': {
+      const tabs = state.tabs.includes(action.id) ? state.tabs : [...state.tabs, action.id]
+      return { ...state, activeId: action.id, tabs }
+    }
+
+    case 'CLOSE_TAB': {
+      const tabs = state.tabs.filter(t => t !== action.id)
+      const activeId = state.activeId === action.id ? (tabs[tabs.length - 1] ?? null) : state.activeId
+      return { ...state, tabs, activeId }
+    }
+
+    case 'GO_HOME':
+      return { ...state, activeId: null }
+
     case 'OPEN_ADD_MODAL':
       return { ...state, modal: { kind: 'add', type: action.modalType, parentId: action.parentId }, pickedColor: FOLDER_COLORS[0] }
 
@@ -151,10 +164,8 @@ function reducer(state: AppState, action: AppAction): AppState {
     case 'SET_PICKED_COLOR':
       return { ...state, pickedColor: action.color }
 
-    case 'TOGGLE_THEME': {
-      const theme = state.theme === 'dark' ? 'light' : 'dark'
-      return { ...state, theme }
-    }
+    case 'TOGGLE_THEME':
+      return { ...state, theme: state.theme === 'dark' ? 'light' : 'dark' }
 
     case 'SET_THEME':
       return { ...state, theme: action.theme }
@@ -173,10 +184,14 @@ function reducer(state: AppState, action: AppAction): AppState {
   }
 }
 
+// ── REDUCER ──────────────────────────────────────────────────────
+function reducer(state: AppState, action: AppAction): AppState {
+  const nextWorkspaceState = reduceWorkspaceState(state, action)
+  return reduceUIState(nextWorkspaceState, action)
+}
+
 // ── CONTEXT ──────────────────────────────────────────────────────
-interface AppContextValue {
-  state: AppState
-  dispatch: Dispatch<AppAction>
+interface PersistenceContextValue {
   schedSave: () => void
   pickFile: () => Promise<void>
   saveNow: (requestHandle?: boolean) => Promise<void>
@@ -184,11 +199,32 @@ interface AppContextValue {
   importFile: () => void
 }
 
-const AppContext = createContext<AppContextValue | null>(null)
+const WorkspaceStateContext = createContext<WorkspaceState | null>(null)
+const UIStateContext = createContext<UIState | null>(null)
+const AppDispatchContext = createContext<Dispatch<AppAction> | null>(null)
+const PersistenceContext = createContext<PersistenceContextValue | null>(null)
 
-export function useAppContext(): AppContextValue {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useAppContext must be used inside AppProvider')
+export function useWorkspaceState(): WorkspaceState {
+  const ctx = useContext(WorkspaceStateContext)
+  if (!ctx) throw new Error('useWorkspaceState must be used inside AppProvider')
+  return ctx
+}
+
+export function useUIState(): UIState {
+  const ctx = useContext(UIStateContext)
+  if (!ctx) throw new Error('useUIState must be used inside AppProvider')
+  return ctx
+}
+
+export function useAppDispatch(): Dispatch<AppAction> {
+  const ctx = useContext(AppDispatchContext)
+  if (!ctx) throw new Error('useAppDispatch must be used inside AppProvider')
+  return ctx
+}
+
+export function usePersistenceContext(): PersistenceContextValue {
+  const ctx = useContext(PersistenceContext)
+  if (!ctx) throw new Error('usePersistenceContext must be used inside AppProvider')
   return ctx
 }
 
@@ -202,16 +238,37 @@ interface AppProviderProps {
     exportFile: () => Promise<void>
     importFile: () => void
   }
-  initialState: AppState
   dispatch: Dispatch<AppAction>
   state: AppState
 }
 
 export function AppProvider({ children, persistence, state, dispatch }: AppProviderProps) {
+  const workspaceState = useMemo<WorkspaceState>(() => ({
+    db: state.db,
+    dbEpoch: state.dbEpoch,
+  }), [state.db, state.dbEpoch])
+
+  const uiState = useMemo<UIState>(() => ({
+    activeId: state.activeId,
+    tabs: state.tabs,
+    theme: state.theme,
+    statusLabel: state.statusLabel,
+    statusDot: state.statusDot,
+    modal: state.modal,
+    pickedColor: state.pickedColor,
+    ctxMenu: state.ctxMenu,
+  }), [state.activeId, state.tabs, state.theme, state.statusLabel, state.statusDot, state.modal, state.pickedColor, state.ctxMenu])
+
   return (
-    <AppContext.Provider value={{ state, dispatch, ...persistence }}>
-      {children}
-    </AppContext.Provider>
+    <PersistenceContext.Provider value={persistence}>
+      <AppDispatchContext.Provider value={dispatch}>
+        <WorkspaceStateContext.Provider value={workspaceState}>
+          <UIStateContext.Provider value={uiState}>
+            {children}
+          </UIStateContext.Provider>
+        </WorkspaceStateContext.Provider>
+      </AppDispatchContext.Provider>
+    </PersistenceContext.Provider>
   )
 }
 

@@ -54,13 +54,6 @@ body {
   overflow: hidden;
 }
 
-html.workbench-landing-mode,
-body.workbench-landing-mode {
-  height: auto;
-  min-height: 100%;
-  overflow: auto;
-}
-
 body {
   background: var(--bg);
   color: var(--tx);

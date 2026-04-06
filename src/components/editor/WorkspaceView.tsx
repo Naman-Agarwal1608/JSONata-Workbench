@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CodeMirrorEditor } from '../ui/CodeMirrorEditor'
 import { TabBar } from './TabBar'
 import { InspectorPanel } from './InspectorPanel'
 import './WorkspaceView.css'
-import { useAppContext } from '../../store/appContext'
+import { usePersistenceContext, useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { useExecution } from '../../hooks/useExecution'
 import { useResizablePanels } from '../../hooks/useResizablePanels'
 import { breadcrumb, findNode } from '../../lib/workspace'
@@ -11,16 +12,25 @@ import { parseCustomFunctions } from '../../lib/customFunctions'
 import type { EditorView } from '../../lib/codemirror'
 
 export function WorkspaceView() {
-  const { state, dispatch, schedSave } = useAppContext()
-  const { db, activeId, theme } = state
+  const { db } = useWorkspaceState()
+  const { activeId, theme } = useUIState()
+  const { schedSave } = usePersistenceContext()
+  const actions = useWorkspaceActions()
 
   const node = findNode(db, activeId!)!
   const inputEditorRef = useRef<EditorView | null>(null)
   const exprEditorRef = useRef<EditorView | null>(null)
 
   const { rszLeft, rszTop, hRszRef, vRszRef, panelsTopRef, panelsRef } = useResizablePanels()
+  const breadcrumbText = useMemo(() => breadcrumb(db, activeId!), [db, activeId])
 
-  const execution = useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef })
+  const execution = useExecution({
+    node,
+    db,
+    inputEditorRef,
+    exprEditorRef,
+    onOpenInspectValue: actions.openValueInspector,
+  })
   const {
     outputText, outputState, runStatus,
     execCtx, execCtxExpanded, execCtxTab, inspectEntries,
@@ -35,7 +45,7 @@ export function WorkspaceView() {
   }, [db.settings.customFunctions])
 
   function handleInputUpdate(val: string) {
-    dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'input', value: val })
+    actions.updateNodeField(activeId!, 'input', val)
     schedSave()
     setJsonErr(!val.trim() ? '' : (() => { try { JSON.parse(val); return '' } catch (e) { return '⚠ ' + (e instanceof Error ? e.message.split('\n')[0] : '') } })())
     scheduleRun()
@@ -49,7 +59,7 @@ export function WorkspaceView() {
   }
 
   function handleExprUpdate(val: string) {
-    dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'expr', value: val })
+    actions.updateNodeField(activeId!, 'expr', val)
     schedSave()
     scheduleRun()
   }
@@ -104,11 +114,11 @@ export function WorkspaceView() {
             defaultValue={node.name}
             placeholder="Untitled"
             onChange={e => {
-              dispatch({ type: 'UPDATE_NODE_FIELD', id: activeId!, field: 'name', value: e.target.value })
+              actions.updateNodeField(activeId!, 'name', e.target.value)
               schedSave()
             }}
           />
-          <span className="bctag" title={breadcrumb(db, activeId!)}>{breadcrumb(db, activeId!)}</span>
+          <span className="bctag" title={breadcrumbText}>{breadcrumbText}</span>
           <button className="hbtn prim" onClick={run}>
             ▶ Run <small style={{ opacity: .55, fontSize: 10 }}>⌘↵</small>
           </button>

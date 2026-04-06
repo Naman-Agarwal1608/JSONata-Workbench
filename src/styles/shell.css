@@ -13,11 +13,6 @@
   overflow: hidden;
 }
 
-.workbench-host.landing-mode {
-  height: auto;
-  overflow: visible;
-}
-
 /* Workspace row: sidebar + main area */
 .ws {
   display: flex;
@@ -38,5 +33,5 @@
 }
 
 .main.main-landing {
-  overflow: hidden;
+  overflow: auto;
 }

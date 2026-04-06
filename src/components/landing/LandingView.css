@@ -1,6 +1,6 @@
 .landing {
   flex: 1 0 auto;
-  overflow: auto;
+  overflow: visible;
   padding: 28px;
   display: block;
   min-height: 100%;

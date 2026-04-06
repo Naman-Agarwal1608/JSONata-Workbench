@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import jsonata from 'jsonata'
-import type { Dispatch } from 'react'
-import type { AppAction } from '../store/appContext'
 import type { ExecContext, InspectEntry, RunStatus, WorkspaceDB, WorkspaceNode } from '../types/workspace'
 import type { EditorView } from '../lib/codemirror'
 import { setEditorErrorLocation, clearEditorErrorLocation } from '../lib/codemirror'
@@ -12,9 +10,9 @@ import { getSettings } from '../lib/workspace'
 interface UseExecutionOptions {
   node: WorkspaceNode
   db: WorkspaceDB
-  dispatch: Dispatch<AppAction>
   inputEditorRef: React.RefObject<EditorView | null>
   exprEditorRef: React.RefObject<EditorView | null>
+  onOpenInspectValue: (entry: InspectEntry) => void
 }
 
 export interface ExecutionResult {
@@ -88,7 +86,7 @@ async function buildExecutionContext({
   }
 }
 
-export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef }: UseExecutionOptions): ExecutionResult {
+export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenInspectValue }: UseExecutionOptions): ExecutionResult {
   const [outputText, setOutputText] = useState('Run the expression to see results…')
   const [outputState, setOutputState] = useState<'ok' | 'err' | 'empty'>('empty')
   const [runStatus, setRunStatus] = useState<RunStatus>({ kind: 'idle' })
@@ -249,7 +247,7 @@ export function useExecution({ node, db, dispatch, inputEditorRef, exprEditorRef
   function openInspectValue(id: string): void {
     const entry = inspectEntries.get(id)
     if (!entry) return
-    dispatch({ type: 'OPEN_VALUE_INSPECTOR', entry })
+    onOpenInspectValue(entry)
   }
 
   // auto-run on mount if there's already content

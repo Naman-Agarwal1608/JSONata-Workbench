@@ -1,9 +1,11 @@
-import { useAppContext } from '../../store/appContext'
+import { useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { findNode, allDescIds } from '../../lib/workspace'
 
 export function DeleteModal({ open }: { open: boolean }) {
-  const { state, dispatch } = useAppContext()
-  const { modal, db } = state
+  const { modal } = useUIState()
+  const { db } = useWorkspaceState()
+  const actions = useWorkspaceActions()
 
   const delMsg = (() => {
     if (modal.kind !== 'delete') return ''
@@ -17,16 +19,16 @@ export function DeleteModal({ open }: { open: boolean }) {
 
   function confirmDelete() {
     if (modal.kind !== 'delete') return
-    dispatch({ type: 'DELETE_NODE', id: modal.id })
+    actions.deleteNode(modal.id)
   }
 
   return (
-    <div className={`overlay${open ? ' open' : ''}`} id="delOv" onClick={e => { if (e.target === e.currentTarget) dispatch({ type: 'CLOSE_MODAL' }) }}>
+    <div className={`overlay${open ? ' open' : ''}`} id="delOv" onClick={e => { if (e.target === e.currentTarget) actions.closeModal() }}>
       <div className="modal">
         <div className="mtitle">Delete</div>
         <div style={{ fontSize: '12px', lineHeight: '1.7', color: 'var(--tx2)' }}>{delMsg}</div>
         <div className="mrow">
-          <button className="hbtn" onClick={() => dispatch({ type: 'CLOSE_MODAL' })}>Cancel</button>
+          <button className="hbtn" onClick={actions.closeModal}>Cancel</button>
           <button
             className="hbtn prim"
             style={{ background: 'var(--err)', borderColor: 'var(--err)', color: '#fff' }}

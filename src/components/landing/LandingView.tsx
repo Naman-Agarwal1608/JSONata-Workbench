@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { CodeMirrorEditor } from '../ui/CodeMirrorEditor'
-import { useAppContext } from '../../store/appContext'
+import { usePersistenceContext, useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import './LandingView.css'
 import { parseJSONText } from '../../lib/helpers'
 import { parseCustomFunctions } from '../../lib/customFunctions'
@@ -8,8 +9,10 @@ import { setEditorErrorLocation } from '../../lib/codemirror'
 import type { EditorView } from '../../lib/codemirror'
 
 export function LandingView() {
-  const { state, dispatch, schedSave, importFile } = useAppContext()
-  const { theme, db, dbEpoch } = state
+  const { theme } = useUIState()
+  const { db, dbEpoch } = useWorkspaceState()
+  const { schedSave, importFile } = usePersistenceContext()
+  const actions = useWorkspaceActions()
   const settings = db.settings
 
   const functionsEditorRef = useRef<EditorView | null>(null)
@@ -19,21 +22,21 @@ export function LandingView() {
   const [functionsErr, setFunctionsErr] = useState('')
 
   function onGlobalContextChange(val: string) {
-    dispatch({ type: 'UPDATE_SETTINGS', key: 'globalContext', value: val })
+    actions.updateSettings('globalContext', val)
     schedSave()
     const res = parseJSONText(val, 'Global context')
     setGlobalContextErr(res.ok ? '' : (res.message ?? ''))
   }
 
   function onBindingsChange(val: string) {
-    dispatch({ type: 'UPDATE_SETTINGS', key: 'bindings', value: val })
+    actions.updateSettings('bindings', val)
     schedSave()
     const res = parseJSONText(val, 'Bindings', { requireObject: true })
     setBindingsErr(res.ok ? '' : (res.message ?? ''))
   }
 
   function onFunctionsChange(val: string) {
-    dispatch({ type: 'UPDATE_SETTINGS', key: 'customFunctions', value: val })
+    actions.updateSettings('customFunctions', val)
     schedSave()
     const res = parseCustomFunctions(val)
     if (!res.ok && res.location && functionsEditorRef.current) {
@@ -55,7 +58,7 @@ export function LandingView() {
           <div className="landing-actions">
             <button
               className="hbtn prim"
-              onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'folder', parentId: null })}
+              onClick={() => actions.openAddModal('folder', null)}
             >
               New Collection
             </button>

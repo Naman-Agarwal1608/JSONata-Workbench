@@ -1,13 +1,16 @@
-import { useAppContext } from '../../store/appContext'
+import { usePersistenceContext, useUIState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import './Header.css'
 
 export function Header() {
-  const { state, dispatch, pickFile, saveNow, exportFile, importFile } = useAppContext()
+  const state = useUIState()
+  const { pickFile, saveNow, exportFile, importFile } = usePersistenceContext()
+  const actions = useWorkspaceActions()
   const { theme, statusLabel, statusDot } = state
 
   return (
     <div className="hdr">
-      <div className="logo" onClick={() => dispatch({ type: 'GO_HOME' })}>
+      <div className="logo" onClick={actions.goHome}>
         <svg className="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
           <rect width="64" height="64" rx="14" fill="var(--surf3)" />
           <path d="M18 20h18a8 8 0 0 1 8 8v16H26a8 8 0 0 1-8-8V20Z" fill="var(--acc)" />
@@ -23,7 +26,7 @@ export function Header() {
       </div>
       <button
         className="hbtn"
-        onClick={() => dispatch({ type: 'TOGGLE_THEME' })}
+        onClick={actions.toggleTheme}
       >
         {theme === 'light' ? '☀ Light' : '☾ Dark'}
       </button>

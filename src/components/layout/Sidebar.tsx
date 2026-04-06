@@ -1,4 +1,4 @@
-import { useAppContext } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { SidebarTree } from './SidebarTree'
 import './Sidebar.css'
 
@@ -10,7 +10,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggleCollapse, onMouseEnter, onMouseLeave }: SidebarProps) {
-  const { dispatch } = useAppContext()
+  const actions = useWorkspaceActions()
 
   return (
     <div className="sb" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
@@ -27,12 +27,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onMouseEnter, onMouseLeav
         <button
           className="sibtn"
           title="New Collection"
-          onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'folder', parentId: null })}
+          onClick={() => actions.openAddModal('folder', null)}
         >📁</button>
         <button
           className="sibtn"
           title="New Script"
-          onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'script', parentId: null })}
+          onClick={() => actions.openAddModal('script', null)}
         >＋</button>
       </div>
       <div className="tscroll">

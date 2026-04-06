@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAppContext, FOLDER_COLORS } from '../../store/appContext'
+import { FOLDER_COLORS, useUIState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 
 export function AddModal({ open }: { open: boolean }) {
-  const { state, dispatch } = useAppContext()
+  const state = useUIState()
+  const actions = useWorkspaceActions()
   const { modal, pickedColor } = state
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -21,17 +23,11 @@ export function AddModal({ open }: { open: boolean }) {
 
   function confirmAdd() {
     if (!name.trim() || modal.kind !== 'add') return
-    dispatch({
-      type: 'ADD_NODE',
-      nodeType: modal.type,
-      name: name.trim(),
-      parentId: modal.parentId,
-      color: pickedColor,
-    })
+    actions.addNode(modal.type, name.trim(), modal.parentId, pickedColor)
   }
 
   return (
-    <div className={`overlay${open ? ' open' : ''}`} id="addOv" onClick={e => { if (e.target === e.currentTarget) dispatch({ type: 'CLOSE_MODAL' }) }}>
+    <div className={`overlay${open ? ' open' : ''}`} id="addOv" onClick={e => { if (e.target === e.currentTarget) actions.closeModal() }}>
       <div className="modal">
         <div className="mtitle">{title}</div>
         <div className="field">
@@ -52,14 +48,14 @@ export function AddModal({ open }: { open: boolean }) {
                   key={c}
                   className={`sw${c === pickedColor ? ' sel' : ''}`}
                   style={{ background: c }}
-                  onClick={() => dispatch({ type: 'SET_PICKED_COLOR', color: c })}
+                  onClick={() => actions.setPickedColor(c)}
                 />
               ))}
             </div>
           </div>
         )}
         <div className="mrow">
-          <button className="hbtn" onClick={() => dispatch({ type: 'CLOSE_MODAL' })}>Cancel</button>
+          <button className="hbtn" onClick={actions.closeModal}>Cancel</button>
           <button className="hbtn prim" onClick={confirmAdd}>Create</button>
         </div>
       </div>

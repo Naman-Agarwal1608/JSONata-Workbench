@@ -1,8 +1,10 @@
-import { useAppContext } from '../../store/appContext'
+import { useUIState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { CodeMirrorEditor } from '../ui/CodeMirrorEditor'
 
 export function ValueInspectorModal({ open }: { open: boolean }) {
-  const { state, dispatch } = useAppContext()
+  const state = useUIState()
+  const actions = useWorkspaceActions()
   const { modal, theme } = state
 
   const entry = modal.kind === 'value-inspector' ? modal.entry : null
@@ -18,14 +20,14 @@ export function ValueInspectorModal({ open }: { open: boolean }) {
   }
 
   return (
-    <div className={`overlay${open ? ' open' : ''}`} id="valOv" onClick={e => { if (e.target === e.currentTarget) dispatch({ type: 'CLOSE_MODAL' }) }}>
+    <div className={`overlay${open ? ' open' : ''}`} id="valOv" onClick={e => { if (e.target === e.currentTarget) actions.closeModal() }}>
       <div className="modal xmodal">
         <div className="xmodal-head">
           <div className="xmodal-copy">
             <div className="mtitle">{entry?.label ?? 'Value Inspector'}</div>
             <small>{entry?.meta ?? 'Read-only value preview'}</small>
           </div>
-          <button className="hbtn" onClick={() => dispatch({ type: 'CLOSE_MODAL' })}>Close</button>
+          <button className="hbtn" onClick={actions.closeModal}>Close</button>
         </div>
         <div className="xmodal-body">
           <div className="cm-wrap">

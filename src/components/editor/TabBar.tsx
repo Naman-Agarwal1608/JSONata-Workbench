@@ -1,27 +1,30 @@
-import { useAppContext } from '../../store/appContext'
+import { useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { findNode } from '../../lib/workspace'
 import './TabBar.css'
 
 export function TabBar() {
-  const { state, dispatch } = useAppContext()
+  const { db } = useWorkspaceState()
+  const { tabs, activeId } = useUIState()
+  const actions = useWorkspaceActions()
 
   return (
     <div className="tabbar">
-      {state.tabs.map(id => {
-        const node = findNode(state.db, id)
+      {tabs.map(id => {
+        const node = findNode(db, id)
         if (!node) return null
         return (
           <div
             key={id}
-            className={`tab${id === state.activeId ? ' active' : ''}`}
-            onClick={() => { if (state.activeId !== id) dispatch({ type: 'OPEN_SCRIPT', id }) }}
+            className={`tab${id === activeId ? ' active' : ''}`}
+            onClick={() => { if (activeId !== id) actions.openScript(id) }}
           >
             <span>{node.name}</span>
             <button
               className="tabx"
               onClick={e => {
                 e.stopPropagation()
-                dispatch({ type: 'CLOSE_TAB', id })
+                actions.closeTab(id)
               }}
             >✕</button>
           </div>

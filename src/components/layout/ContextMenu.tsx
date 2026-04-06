@@ -1,11 +1,14 @@
 import { useEffect } from 'react'
-import { useAppContext } from '../../store/appContext'
+import { useAppDispatch, useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { findNode } from '../../lib/workspace'
 import './ContextMenu.css'
 
 export function ContextMenu() {
-  const { state, dispatch } = useAppContext()
-  const { ctxMenu, db } = state
+  const { ctxMenu } = useUIState()
+  const { db } = useWorkspaceState()
+  const dispatch = useAppDispatch()
+  const actions = useWorkspaceActions()
 
   // Close on any click outside
   useEffect(() => {
@@ -21,12 +24,12 @@ export function ContextMenu() {
   const isFolder = node?.type === 'folder'
 
   function act(action: 'af' | 'as' | 'rn' | 'del') {
-    dispatch({ type: 'CLOSE_CTX_MENU' })
+    actions.closeContextMenu()
     if (!ctxMenu) return
-    if (action === 'af') dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'folder', parentId: ctxMenu.id })
-    else if (action === 'as') dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'script', parentId: ctxMenu.id })
-    else if (action === 'rn') dispatch({ type: 'OPEN_RENAME_MODAL', id: ctxMenu.id })
-    else if (action === 'del') dispatch({ type: 'OPEN_DELETE_MODAL', id: ctxMenu.id })
+    if (action === 'af') actions.openAddModal('folder', ctxMenu.id)
+    else if (action === 'as') actions.openAddModal('script', ctxMenu.id)
+    else if (action === 'rn') actions.openRenameModal(ctxMenu.id)
+    else if (action === 'del') actions.openDeleteModal(ctxMenu.id)
   }
 
   return (

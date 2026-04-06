@@ -1,11 +1,12 @@
-import { useAppContext } from '../../store/appContext'
+import { useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { kids, folderColor } from '../../lib/workspace'
 import type { WorkspaceNode } from '../../types/workspace'
 import './SidebarTree.css'
 
 export function SidebarTree() {
-  const { state } = useAppContext()
-  const roots = kids(state.db, null)
+  const { db } = useWorkspaceState()
+  const roots = kids(db, null)
 
   if (!roots.length) {
     return (
@@ -23,17 +24,18 @@ export function SidebarTree() {
 }
 
 function TreeNode({ node, depth }: { node: WorkspaceNode; depth: number }) {
-  const { state, dispatch, schedSave } = useAppContext()
-  const isActive = node.id === state.activeId
-  const children = node.type === 'folder' ? kids(state.db, node.id) : []
+  const { db } = useWorkspaceState()
+  const { activeId } = useUIState()
+  const actions = useWorkspaceActions()
+  const isActive = node.id === activeId
+  const children = node.type === 'folder' ? kids(db, node.id) : []
 
   function handleRowClick(e: React.MouseEvent) {
     if ((e.target as Element).closest('.tacts')) return
     if (node.type === 'folder') {
-      dispatch({ type: 'TOGGLE_FOLDER', id: node.id })
-      schedSave()
+      actions.toggleFolder(node.id)
     } else {
-      dispatch({ type: 'OPEN_SCRIPT', id: node.id })
+      actions.openScript(node.id)
     }
   }
 
@@ -42,7 +44,7 @@ function TreeNode({ node, depth }: { node: WorkspaceNode; depth: number }) {
     let x = e.clientX, y = e.clientY
     if (x + 180 > window.innerWidth) x = window.innerWidth - 184
     if (y + 160 > window.innerHeight) y = window.innerHeight - 164
-    dispatch({ type: 'OPEN_CTX_MENU', id: node.id, x, y })
+    actions.openContextMenu(node.id, x, y)
   }
 
   return (
@@ -62,7 +64,7 @@ function TreeNode({ node, depth }: { node: WorkspaceNode; depth: number }) {
         {node.type === 'folder' ? (
           <div
             className="tfoldericon"
-            style={{ '--fc': node.color || folderColor(state.db, node.id) } as React.CSSProperties}
+            style={{ '--fc': node.color || folderColor(db, node.id) } as React.CSSProperties}
           />
         ) : (
           <div className="tscripticon">◈</div>
@@ -76,24 +78,24 @@ function TreeNode({ node, depth }: { node: WorkspaceNode; depth: number }) {
               <button
                 className="tact"
                 title="New subfolder"
-                onClick={e => { e.stopPropagation(); dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'folder', parentId: node.id }) }}
+                onClick={e => { e.stopPropagation(); actions.openAddModal('folder', node.id) }}
               >📁</button>
               <button
                 className="tact"
                 title="New script"
-                onClick={e => { e.stopPropagation(); dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'script', parentId: node.id }) }}
+                onClick={e => { e.stopPropagation(); actions.openAddModal('script', node.id) }}
               >＋</button>
             </>
           )}
           <button
             className="tact"
             title="Rename"
-            onClick={e => { e.stopPropagation(); dispatch({ type: 'OPEN_RENAME_MODAL', id: node.id }) }}
+            onClick={e => { e.stopPropagation(); actions.openRenameModal(node.id) }}
           >✎</button>
           <button
             className="tact del"
             title="Delete"
-            onClick={e => { e.stopPropagation(); dispatch({ type: 'OPEN_DELETE_MODAL', id: node.id }) }}
+            onClick={e => { e.stopPropagation(); actions.openDeleteModal(node.id) }}
           >✕</button>
         </div>
       </div>
@@ -106,7 +108,7 @@ function TreeNode({ node, depth }: { node: WorkspaceNode; depth: number }) {
             <div
               className="tempty"
               style={{ paddingLeft: (depth + 1) * 13 + 20 }}
-              onClick={() => dispatch({ type: 'OPEN_ADD_MODAL', modalType: 'script', parentId: node.id })}
+              onClick={() => actions.openAddModal('script', node.id)}
             >
               + New Script
             </div>

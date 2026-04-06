@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAppContext } from '../../store/appContext'
+import { useUIState, useWorkspaceState } from '../../store/appContext'
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import { findNode } from '../../lib/workspace'
 
 export function RenameModal({ open }: { open: boolean }) {
-  const { state, dispatch } = useAppContext()
-  const { modal, db } = state
+  const { modal } = useUIState()
+  const { db } = useWorkspaceState()
+  const actions = useWorkspaceActions()
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -18,11 +20,11 @@ export function RenameModal({ open }: { open: boolean }) {
 
   function confirmRename() {
     if (!name.trim() || modal.kind !== 'rename') return
-    dispatch({ type: 'RENAME_NODE', id: modal.id, name: name.trim() })
+    actions.renameNode(modal.id, name.trim())
   }
 
   return (
-    <div className={`overlay${open ? ' open' : ''}`} id="rnOv" onClick={e => { if (e.target === e.currentTarget) dispatch({ type: 'CLOSE_MODAL' }) }}>
+    <div className={`overlay${open ? ' open' : ''}`} id="rnOv" onClick={e => { if (e.target === e.currentTarget) actions.closeModal() }}>
       <div className="modal">
         <div className="mtitle">Rename</div>
         <div className="field">
@@ -35,7 +37,7 @@ export function RenameModal({ open }: { open: boolean }) {
           />
         </div>
         <div className="mrow">
-          <button className="hbtn" onClick={() => dispatch({ type: 'CLOSE_MODAL' })}>Cancel</button>
+          <button className="hbtn" onClick={actions.closeModal}>Cancel</button>
           <button className="hbtn prim" onClick={confirmRename}>Rename</button>
         </div>
       </div>
