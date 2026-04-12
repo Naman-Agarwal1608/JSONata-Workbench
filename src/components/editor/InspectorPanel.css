@@ -49,10 +49,7 @@
   background: rgba(255, 255, 255, .015);
   padding: 12px 14px;
   overflow: auto;
-  height: 260px;
-  min-height: 180px;
-  max-height: none;
-  resize: vertical;
+  min-height: 120px;
   font-size: 11px;
   flex-shrink: 0;
 }

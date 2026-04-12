@@ -10,6 +10,7 @@ import { useResizablePanels } from '../../hooks/useResizablePanels'
 import { breadcrumb, findNode } from '../../lib/workspace'
 import { parseCustomFunctions } from '../../lib/customFunctions'
 import type { EditorView } from '../../lib/codemirror'
+import { extractJsonKeys } from '../../lib/codemirror'
 
 export function WorkspaceView() {
   const { db } = useWorkspaceState()
@@ -22,6 +23,11 @@ export function WorkspaceView() {
   const exprEditorRef = useRef<EditorView | null>(null)
 
   const { rszLeft, rszTop, hRszRef, vRszRef, panelsTopRef, panelsRef } = useResizablePanels()
+  const [inspectorH, setInspectorH] = useState(260)
+  const inspectorHRef = useRef(inspectorH)
+  inspectorHRef.current = inspectorH
+  const iRszRef = useRef<HTMLDivElement>(null)
+  const outPanelRef = useRef<HTMLDivElement>(null)
   const breadcrumbText = useMemo(() => breadcrumb(db, activeId!), [db, activeId])
 
   const execution = useExecution({
@@ -43,6 +49,23 @@ export function WorkspaceView() {
     const result = parseCustomFunctions(db.settings.customFunctions || '')
     return result.ok ? (result.value ?? []) : []
   }, [db.settings.customFunctions])
+
+  const getBindingVars = useCallback(() => {
+    try {
+      const obj = JSON.parse(db.settings.bindings || '')
+      if (obj && typeof obj === 'object' && !Array.isArray(obj))
+        return Object.keys(obj).map(k => '$' + k)
+    } catch { /* invalid JSON, return empty */ }
+    return []
+  }, [db.settings.bindings])
+
+  const getInputKeys = useCallback(() => {
+    const raw = (inputEditorRef.current?.state.doc.toString().trim() || db.settings.globalContext || '').trim()
+    if (!raw) return []
+    try { return extractJsonKeys(JSON.parse(raw)) } catch { return [] }
+  // inputEditorRef is a live ref — no dep needed for it
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db.settings.globalContext])
 
   function handleInputUpdate(val: string) {
     actions.updateNodeField(activeId!, 'input', val)
@@ -87,6 +110,31 @@ export function WorkspaceView() {
     if (!view) return
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '' } })
   }
+
+  // Inspector drag-to-resize
+  useEffect(() => {
+    const el = iRszRef.current
+    if (!el) return
+    function onDown(e: MouseEvent) {
+      e.preventDefault()
+      const startY = e.clientY
+      const startH = inspectorHRef.current
+      el!.classList.add('dragging')
+      function onMove(ev: MouseEvent) {
+        const totalH = outPanelRef.current?.getBoundingClientRect().height ?? 400
+        setInspectorH(Math.max(120, Math.min(totalH - 80, startH + (startY - ev.clientY))))
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        el!.classList.remove('dragging')
+      }
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    }
+    el.addEventListener('mousedown', onDown)
+    return () => el.removeEventListener('mousedown', onDown)
+  }, [execCtxExpanded])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -172,6 +220,8 @@ export function WorkspaceView() {
                   theme={theme}
                   editorRef={exprEditorRef}
                   getCustomFunctionEntries={getCustomFunctionEntries}
+                  getBindingVars={getBindingVars}
+                  getInputKeys={getInputKeys}
                   onUpdate={handleExprUpdate}
                 />
               </div>
@@ -181,6 +231,7 @@ export function WorkspaceView() {
           <div className="rsz-v" ref={vRszRef} />
 
           <div
+            ref={outPanelRef}
             className="panel"
             id="panelOut"
             style={{ flexGrow: 100 - rszTop, flexShrink: 1, flexBasis: 0, borderTop: '1px solid var(--bdr)' }}
@@ -209,9 +260,11 @@ export function WorkspaceView() {
               </div>
             )}
 
+            {execCtxExpanded && <div className="rsz-v" ref={iRszRef} />}
             <InspectorPanel
               execCtx={execCtx}
               execCtxExpanded={execCtxExpanded}
+              height={inspectorH}
               execCtxTab={execCtxTab}
               inspectEntries={inspectEntries}
               onToggle={toggleExecCtx}

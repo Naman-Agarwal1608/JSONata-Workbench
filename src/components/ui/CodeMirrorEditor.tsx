@@ -12,6 +12,8 @@ interface CodeMirrorEditorProps {
   onUpdate?: (value: string) => void
   onPaste?: (value: string, view: EditorView) => void
   getCustomFunctionEntries?: () => CustomFunctionEntry[]
+  getBindingVars?: () => string[]
+  getInputKeys?: () => string[]
   editorRef?: React.RefObject<EditorView | null>
 }
 
@@ -24,6 +26,8 @@ export function CodeMirrorEditor({
   onUpdate,
   onPaste,
   getCustomFunctionEntries,
+  getBindingVars,
+  getInputKeys,
   editorRef,
 }: CodeMirrorEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,6 +49,8 @@ export function CodeMirrorEditor({
         withErrorMarkers,
         theme,
         getCustomFunctionEntries,
+        getBindingVars,
+        getInputKeys,
         updateListener: update => {
           if (update.docChanged) onUpdateRef.current?.(update.state.doc.toString())
         },

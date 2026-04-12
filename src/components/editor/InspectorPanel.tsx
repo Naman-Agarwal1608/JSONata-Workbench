@@ -5,6 +5,7 @@ import './InspectorPanel.css'
 interface InspectorPanelProps {
   execCtx: ExecContext | null
   execCtxExpanded: boolean
+  height: number
   execCtxTab: 'values' | 'scope' | 'functions'
   inspectEntries: Map<string, InspectEntry>
   onToggle: () => void
@@ -13,7 +14,7 @@ interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
-  execCtx, execCtxExpanded, execCtxTab, inspectEntries,
+  execCtx, execCtxExpanded, height, execCtxTab, inspectEntries,
   onToggle, onSetTab, onInspectValue,
 }: InspectorPanelProps) {
   const metaText = (() => {
@@ -33,7 +34,7 @@ export function InspectorPanel({
       </button>
 
       {execCtxExpanded && (
-        <div className={`errctx${execCtxExpanded ? ' open' : ''}`}>
+        <div className={`errctx${execCtxExpanded ? ' open' : ''}`} style={{ height }}>
           {!execCtx ? (
             <div className="errctx-grid">
               <section className="errctx-card">
