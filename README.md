@@ -15,6 +15,7 @@ It runs as a static `React 18 + Vite + TypeScript` app with no backend.
 - edit input JSON, JSONata expressions, and output side-by-side
 - define global context, bindings, and reusable custom functions
 - inspect results and resolved values in a dedicated inspector
+- inspect hovered expressions and selected subexpressions inline
 - auto-save to a linked workspace file
 - import and export workspace snapshots
 - run as a static frontend app and deploy to GitHub Pages
@@ -48,11 +49,13 @@ The workbench uses `CodeMirror 6` everywhere.
 - JSONata editor for expressions
 - JavaScript editor for custom functions
 - autocomplete for JSONata built-ins and workspace custom functions
-- hover help for JSONata functions
+- hover tooltips for JSONata functions and live runtime values
+- selection tooltip inspection for evaluating a selected subexpression in context
 - search support
 - code folding
 - collapsed JSON summaries such as object key counts and array item counts
 - line highlighting for detected error locations
+- lazy-loaded editor runtime with chunk-split CodeMirror bundles
 
 ### Execution Experience
 
@@ -62,6 +65,7 @@ The workbench uses `CodeMirror 6` everywhere.
 - `Running…` feedback while a queued run is pending
 - formatted JSON output
 - error reporting with line/column when available
+- shared execution environment across full run, hover inspection, and selection inspection
 
 ### Inspector
 
@@ -72,6 +76,12 @@ The bottom `Inspector` panel includes tabbed views for:
 - `Custom Functions`
 
 Resolved values can be opened in a read-only value inspector modal.
+
+In-editor inspection also supports:
+
+- hover a path, variable, or function call to inspect its current value
+- select part of an expression and hover over that selection to evaluate it in scoped context
+- collapsible JSON viewers inside tooltips for structured results
 
 ### Persistence And File Flows
 
@@ -107,6 +117,14 @@ When you run a script:
 5. the JSONata expression is compiled and evaluated
 6. the output panel renders the result
 7. the inspector builds execution context details
+
+Hover and selection inspection use the same execution environment rules:
+
+1. parse per-script input JSON if valid
+2. otherwise fall back to `Global Context`
+3. require valid `Bindings`
+4. register `Custom Functions`
+5. evaluate the hovered or selected expression inside reconstructed top-level scope when possible
 
 ## Examples
 
@@ -177,11 +195,14 @@ src/
     usePersistence.ts
     useResizablePanels.ts
     useSidebar.ts
+    useWorkspaceActions.ts
   lib/
     codemirror.ts
     customFunctions.ts
+    execution.ts
     helpers.ts
     workspace.ts
+  main.tsx
   store/
     appContext.tsx
   styles/
@@ -204,6 +225,8 @@ public/
   - `src/styles/shell.css`
   - `src/styles/ui.css`
 - Editor/runtime behavior is split into hooks and utility modules instead of one large browser script.
+- `src/lib/execution.ts` centralizes shared execution-environment building for runs and inline inspection.
+- `src/components/ui/CodeMirrorEditor.tsx` lazy-loads the editor runtime and manages editor lifecycle explicitly.
 
 ## Demo Workspace
 
@@ -244,6 +267,15 @@ Vite writes the production app to:
 - `dist/`
 
 That output is a static frontend build suitable for GitHub Pages or any static hosting.
+
+The production build splits editor/runtime code into separate chunks:
+
+- main app shell
+- JSONata runtime
+- CodeMirror core
+- CodeMirror language/editor extensions
+
+This keeps the initial app bundle smaller and avoids one monolithic editor chunk.
 
 ## Deployment
 
