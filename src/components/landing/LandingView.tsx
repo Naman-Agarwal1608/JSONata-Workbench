@@ -5,7 +5,6 @@ import { useWorkspaceActions } from '../../hooks/useWorkspaceActions'
 import './LandingView.css'
 import { parseJSONText } from '../../lib/helpers'
 import { parseCustomFunctions } from '../../lib/customFunctions'
-import { setEditorErrorLocation } from '../../lib/codemirror'
 import type { EditorView } from '../../lib/codemirror'
 
 export function LandingView() {
@@ -40,7 +39,9 @@ export function LandingView() {
     schedSave()
     const res = parseCustomFunctions(val)
     if (!res.ok && res.location && functionsEditorRef.current) {
-      setEditorErrorLocation(functionsEditorRef.current, res.location)
+      void import('../../lib/codemirror').then(({ setEditorErrorLocation }) => {
+        setEditorErrorLocation(functionsEditorRef.current, res.location ?? null)
+      })
     }
     setFunctionsErr(res.ok ? '' : (res.message ?? ''))
   }

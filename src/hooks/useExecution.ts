@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import jsonata from 'jsonata'
-import type { ExecContext, InspectEntry, RunStatus, WorkspaceDB, WorkspaceNode } from '../types/workspace'
+import type { CustomFunctionEntry, ExecContext, InspectEntry, RunStatus, WorkspaceDB, WorkspaceNode } from '../types/workspace'
 import type { EditorView } from '../lib/codemirror'
-import { setEditorErrorLocation, clearEditorErrorLocation } from '../lib/codemirror'
-import { parseJSONText, summariseValue, getExpressionSnippet, getJsonataErrorLocation, formatErrorLocation, splitTopLevelStatements, uid } from '../lib/helpers'
-import { parseCustomFunctions, registerCustomFunctions } from '../lib/customFunctions'
+import { buildScopedExpression, getValueViewerConfig, getExpressionSnippet, getJsonataErrorLocation, formatErrorLocation, splitTopLevelStatements, uid } from '../lib/helpers'
+import { registerCustomFunctions } from '../lib/customFunctions'
+import { buildExecutionEnvironment } from '../lib/execution'
 import { getSettings } from '../lib/workspace'
 
 interface UseExecutionOptions {
@@ -18,6 +18,7 @@ interface UseExecutionOptions {
 export interface ExecutionResult {
   outputText: string
   outputState: 'ok' | 'err' | 'empty'
+  outputMode: 'json' | 'plain'
   runStatus: RunStatus
   execCtx: ExecContext | null
   execCtxExpanded: boolean
@@ -28,9 +29,20 @@ export interface ExecutionResult {
   toggleExecCtx: (force?: boolean) => void
   setExecCtxTab: (tab: 'values' | 'scope' | 'functions') => void
   openInspectValue: (id: string) => void
+  evaluateSelection: () => Promise<{ label: string; value: unknown; from: number; to: number } | null>
 }
 
 const AUTO_RUN_DEBOUNCE_MS = 250
+
+async function setExecutionEditorErrorLocation(view: EditorView | null, loc: { line?: number } | null): Promise<void> {
+  const { setEditorErrorLocation } = await import('../lib/codemirror')
+  setEditorErrorLocation(view, loc)
+}
+
+async function clearExecutionEditorErrorLocation(view: EditorView | null): Promise<void> {
+  const { clearEditorErrorLocation } = await import('../lib/codemirror')
+  clearEditorErrorLocation(view)
+}
 
 function formatDurationMs(ms: number): number {
   return ms < 10 ? Number(ms.toFixed(2)) : ms < 100 ? Number(ms.toFixed(1)) : Math.round(ms)
@@ -41,7 +53,7 @@ async function getVariableSnapshots(
   loc: { line?: number } | null,
   data: unknown,
   bindings: Record<string, unknown>,
-  customFns: ReturnType<typeof parseCustomFunctions>['value'],
+  customFns: CustomFunctionEntry[],
 ): Promise<Array<{ name: string; value: unknown; line: number }>> {
   const statements = splitTopLevelStatements(expr)
   const snapshots: Array<{ name: string; value: unknown; line: number }> = []
@@ -67,8 +79,8 @@ async function buildExecutionContext({
   expr, data = {}, bindings, customFns, functionsError, error = null, location = null, resultValue = undefined,
 }: {
   expr: string; data?: unknown; bindings?: Record<string, unknown>
-  customFns?: ReturnType<typeof parseCustomFunctions>['value']
-  functionsError?: ReturnType<typeof parseCustomFunctions> | null
+  customFns?: CustomFunctionEntry[]
+  functionsError?: { ok: boolean; message?: string | undefined } | null
   error?: Error | null; location?: { line?: number } | null; resultValue?: unknown
 }): Promise<ExecContext> {
   let variableSnapshots: ExecContext['variableSnapshots'] = []
@@ -89,6 +101,7 @@ async function buildExecutionContext({
 export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenInspectValue }: UseExecutionOptions): ExecutionResult {
   const [outputText, setOutputText] = useState('Run the expression to see results…')
   const [outputState, setOutputState] = useState<'ok' | 'err' | 'empty'>('empty')
+  const [outputMode, setOutputMode] = useState<'json' | 'plain'>('plain')
   const [runStatus, setRunStatus] = useState<RunStatus>({ kind: 'idle' })
   const [execCtx, setExecCtx] = useState<ExecContext | null>(null)
   const [execCtxExpanded, setExecCtxExpanded] = useState(false)
@@ -104,9 +117,10 @@ export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenIn
   useEffect(() => { nodeRef.current = node }, [node])
   useEffect(() => { dbRef.current = db }, [db])
 
-  function setOutput(text: string, state: 'ok' | 'err' | 'empty') {
+  function setOutput(text: string, state: 'ok' | 'err' | 'empty', mode: 'json' | 'plain' = 'plain') {
     setOutputText(text)
     setOutputState(state)
+    setOutputMode(mode)
   }
 
   function scheduleExecutionContext(task: () => Promise<ExecContext>, expr: string): void {
@@ -134,67 +148,52 @@ export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenIn
 
     const expr = exprView.state.doc.toString().trim()
     if (!expr) {
-      clearEditorErrorLocation(exprView)
-      setOutput('Enter an expression in the middle panel…', 'empty')
+      await clearExecutionEditorErrorLocation(exprView)
+      setOutput('Enter an expression in the middle panel…', 'empty', 'plain')
       setRunStatus({ kind: 'idle' })
       setExecCtx(null)
       return
     }
 
     const settings = getSettings(dbRef.current)
-    const bindingsResult = parseJSONText(settings.bindings || '', 'Bindings', { requireObject: true })
-    if (!bindingsResult.ok) {
-      clearEditorErrorLocation(exprView)
-      setOutput(bindingsResult.message ?? 'Invalid bindings', 'err')
+    const envResult = buildExecutionEnvironment(
+      inputEditorRef.current?.state.doc.toString() ?? '',
+      settings.globalContext || '',
+      settings.bindings || '',
+      settings.customFunctions || '',
+    )
+    if (!envResult.ok) {
+      await clearExecutionEditorErrorLocation(exprView)
+      const msg = envResult.message ?? 'Invalid execution environment'
+      const statusText = msg.includes('Bindings') ? '✗ Invalid bindings' : '✗ Invalid input data'
+      setOutput(msg, 'err')
       setExecCtxExpanded(true)
       scheduleExecutionContext(
-        () => buildExecutionContext({ expr, bindings: {}, customFns: [], error: new Error(bindingsResult.message) }),
+        () => buildExecutionContext({ expr, bindings: {}, customFns: [], error: new Error(msg) }),
         expr,
       )
-      setRunStatus({ kind: 'err', text: '✗ Invalid bindings' })
+      setRunStatus({ kind: 'err', text: statusText })
       return
     }
-
-    const functionsResult = parseCustomFunctions(settings.customFunctions || '')
-    const customFns = functionsResult.ok ? (functionsResult.value ?? []) : []
-
-    let data: unknown = {}
-    const rawInput = (inputEditorRef.current ? inputEditorRef.current.state.doc.toString() : '').trim()
-    const rawGlobal = (settings.globalContext || '').trim()
-    const sourceLabel = rawInput ? 'JSON input' : 'Global context'
-    const dataRaw = rawInput || rawGlobal
-    if (dataRaw) {
-      try { data = JSON.parse(dataRaw) } catch (e) {
-        clearEditorErrorLocation(exprView)
-        const msg = sourceLabel + ' error:\n' + (e instanceof Error ? e.message : String(e))
-        setOutput(msg, 'err')
-        setExecCtxExpanded(true)
-        scheduleExecutionContext(
-          () => buildExecutionContext({
-            expr, bindings: bindingsResult.value as Record<string, unknown>, customFns, functionsError: functionsResult, error: new Error(msg),
-          }),
-          expr,
-        )
-        setRunStatus({ kind: 'err', text: `✗ Invalid ${sourceLabel.toLowerCase()}` })
-        return
-      }
-    }
+    const { data, bindings, customFns, functionsResult } = envResult.value
 
     const startedAt = performance.now()
     setRunStatus({ kind: 'busy', text: 'Running…' })
     try {
       const compiled = jsonata(expr)
       registerCustomFunctions(compiled as Parameters<typeof registerCustomFunctions>[0], customFns)
-      const result = await compiled.evaluate(data as object, bindingsResult.value as Record<string, unknown>)
+      const result = await compiled.evaluate(data as object, bindings)
       const durationMs = formatDurationMs(performance.now() - startedAt)
-      const out = result === undefined ? '(undefined — expression returned no value)' : JSON.stringify(result, null, 2)
-      clearEditorErrorLocation(exprView)
-      setOutput(out, 'ok')
+      const viewer = result === undefined
+        ? { doc: '(undefined — expression returned no value)', mode: 'plain' as const }
+        : getValueViewerConfig(result)
+      await clearExecutionEditorErrorLocation(exprView)
+      setOutput(viewer.doc, 'ok', viewer.mode)
       const warn = !functionsResult.ok ? ' · custom functions ignored' : ''
       setRunStatus({ kind: 'ok', text: '✓ OK' + warn, durationMs })
       scheduleExecutionContext(
         () => buildExecutionContext({
-          expr, data, bindings: bindingsResult.value as Record<string, unknown>,
+          expr, data, bindings,
           customFns, functionsError: functionsResult, resultValue: result,
         }),
         expr,
@@ -203,14 +202,14 @@ export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenIn
       const durationMs = formatDurationMs(performance.now() - startedAt)
       const err = e as Error & { position?: number }
       const loc = getJsonataErrorLocation(err, expr)
-      if (loc) setEditorErrorLocation(exprView, loc)
+      if (loc) await setExecutionEditorErrorLocation(exprView, loc)
       const msg = (err.message || String(err)) + formatErrorLocation(loc)
-      setOutput(msg, 'err')
+      setOutput(msg, 'err', 'plain')
       setExecCtxExpanded(true)
       scheduleExecutionContext(
         () => buildExecutionContext({
           error: err, expr, data, location: loc,
-          bindings: bindingsResult.value as Record<string, unknown>,
+          bindings,
           customFns, functionsError: functionsResult,
         }),
         expr,
@@ -250,6 +249,34 @@ export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenIn
     onOpenInspectValue(entry)
   }
 
+  async function evaluateSelection(): Promise<{ label: string; value: unknown; from: number; to: number } | null> {
+    const exprView = exprEditorRef.current
+    if (!exprView) return null
+
+    const mainSel = exprView.state.selection.main
+    if (mainSel.empty) return null
+
+    const fullExpr = exprView.state.doc.toString()
+    const selected = fullExpr.slice(mainSel.from, mainSel.to).trim()
+    if (!selected) return null
+
+    const settings = getSettings(dbRef.current)
+    const envResult = buildExecutionEnvironment(
+      inputEditorRef.current?.state.doc.toString() ?? '',
+      settings.globalContext || '',
+      settings.bindings || '',
+      settings.customFunctions || '',
+    )
+    if (!envResult.ok) throw new Error(envResult.message ?? 'Invalid execution environment')
+    const { data, bindings, customFns } = envResult.value
+
+    const scopedExpr = buildScopedExpression(fullExpr, selected, mainSel.from)
+    const compiled = jsonata(scopedExpr)
+    registerCustomFunctions(compiled as Parameters<typeof registerCustomFunctions>[0], customFns)
+    const value = await compiled.evaluate(data as object, bindings)
+    return { label: selected, value, from: mainSel.from, to: mainSel.to }
+  }
+
   // auto-run on mount if there's already content
   useEffect(() => {
     if (node.expr?.trim()) scheduleRun()
@@ -266,8 +293,8 @@ export function useExecution({ node, db, inputEditorRef, exprEditorRef, onOpenIn
   }, [execCtx])
 
   return {
-    outputText, outputState, runStatus,
+    outputText, outputState, outputMode, runStatus,
     execCtx, execCtxExpanded, execCtxTab, inspectEntries,
-    run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue,
+    run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue, evaluateSelection,
   }
 }

@@ -53,8 +53,10 @@ import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { jsonata as jsonataFn } from "@jsonhero/codemirror-lang-jsonata";
+import jsonata from "jsonata";
 import type { CustomFunctionEntry } from "../types/workspace";
-import { esc } from "./helpers";
+import { buildScopedExpression, esc, getValueViewerConfig } from "./helpers";
+import { registerCustomFunctions } from "./customFunctions";
 
 export { EditorView, EditorState };
 
@@ -354,19 +356,6 @@ function extractExprIdentifiers(expr: string): string[] {
   return [...keys];
 }
 
-export function extractJsonKeys(val: unknown): string[] {
-  // Top-level keys only — nested keys are accessed via paths (e.g. user.name)
-  if (!val || typeof val !== "object") return [];
-  if (Array.isArray(val)) {
-    // Peek into the first element since JSONata maps arrays transparently
-    const first = val[0];
-    if (first && typeof first === "object" && !Array.isArray(first))
-      return Object.keys(first as Record<string, unknown>);
-    return [];
-  }
-  return Object.keys(val as Record<string, unknown>);
-}
-
 export function createJsonataCompletion(
   getEntries: () => CustomFunctionEntry[],
   getBindingVars?: () => string[],
@@ -458,36 +447,259 @@ export function createJsonataCompletion(
 }
 
 // ── HOVER TOOLTIP ────────────────────────────────────────────────
+export interface HoverContext {
+  inputData: unknown
+  bindingValues: Record<string, unknown>
+  customFns: CustomFunctionEntry[]
+}
+
+interface HoverTokenInfo {
+  token: string
+  tokenStart: number
+  tokenEnd: number
+  word: string
+  wordStart: number
+  wordEnd: number
+}
+
+function makeValueTooltip(
+  label: string,
+  value: unknown,
+  span: { pos: number; end: number; above: boolean },
+) {
+  return {
+    ...span,
+    create() {
+      const dom = document.createElement('div')
+      dom.className = 'cm-fn-tooltip'
+      const title = document.createElement('div')
+      title.className = 'cm-fn-tt-sig'
+      title.textContent = label
+      dom.appendChild(title)
+      const editorHost = document.createElement('div')
+      editorHost.className = 'cm-fn-tt-editorHost'
+      dom.appendChild(editorHost)
+
+      const theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'
+      const { doc, mode } = getValueViewerConfig(value)
+      const editor = new EditorView({
+        doc,
+        parent: editorHost,
+        extensions: buildEditorExtensions({
+          mode,
+          readOnly: true,
+          theme,
+        }),
+      })
+
+      return {
+        dom,
+        destroy() {
+          editor.destroy()
+        },
+      }
+    },
+  }
+}
+
+function makeFnTooltip(
+  fn: { label: string; sig: string; info: string },
+  span: { pos: number; end: number; above: boolean },
+) {
+  return {
+    ...span,
+    create() {
+      const dom = document.createElement('div')
+      dom.className = 'cm-fn-tooltip'
+      dom.innerHTML =
+        `<div class="cm-fn-tt-sig">${esc(fn.label + fn.sig)}</div>` +
+        `<div class="cm-fn-tt-info">${esc(fn.info)}</div>`
+      return { dom }
+    },
+  }
+}
+
+// Find the position after the closing ')' that matches the '(' at openPos.
+// Returns -1 if not found. Handles nesting and string literals.
+function findMatchingParen(text: string, openPos: number): number {
+  let depth = 1
+  let inStr: '' | '"' | "'" | '`' = ''
+  let escaped = false
+  for (let i = openPos + 1; i < text.length; i++) {
+    const ch = text[i]
+    if (inStr) {
+      if (escaped) { escaped = false; continue }
+      if (ch === '\\') { escaped = true; continue }
+      if (ch === inStr) inStr = ''
+    } else {
+      if (ch === '"' || ch === "'" || ch === '`') { inStr = ch; continue }
+      if (ch === '(') depth++
+      else if (ch === ')') { depth--; if (depth === 0) return i + 1 }
+    }
+  }
+  return -1
+}
+
+function findObjectValueExpression(
+  docText: string,
+  wordStart: number,
+  wordEnd: number,
+): { expr: string; start: number; end: number } | null {
+  let cursor = wordEnd
+  const quote = wordStart > 0 ? docText[wordStart - 1] : ""
+  if ((quote === '"' || quote === "'") && docText[wordEnd] === quote) cursor = wordEnd + 1
+
+  while (cursor < docText.length && /\s/.test(docText[cursor])) cursor++
+  if (docText[cursor] !== ":") return null
+  if (docText[cursor + 1] === "=") return null
+  cursor++
+  while (cursor < docText.length && /\s/.test(docText[cursor])) cursor++
+  if (docText[cursor] === "=") return null
+  if (cursor >= docText.length) return null
+
+  const valueStart = cursor
+  let paren = 0
+  let brace = 0
+  let bracket = 0
+  let inStr: '' | '"' | "'" | '`' = ''
+  let escaped = false
+
+  for (let i = valueStart; i < docText.length; i++) {
+    const ch = docText[i]
+    if (inStr) {
+      if (escaped) escaped = false
+      else if (ch === "\\") escaped = true
+      else if (ch === inStr) inStr = ''
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inStr = ch
+      continue
+    }
+    if (ch === "(") paren++
+    else if (ch === ")" && paren > 0) paren--
+    else if (ch === "{") brace++
+    else if (ch === "}" && brace > 0) brace--
+    else if (ch === "[") bracket++
+    else if (ch === "]" && bracket > 0) bracket--
+    else if ((ch === "," || ch === "}") && paren === 0 && brace === 0 && bracket === 0) {
+      const expr = docText.slice(valueStart, i).trim()
+      return expr ? { expr, start: valueStart, end: i } : null
+    }
+  }
+
+  const expr = docText.slice(valueStart).trim()
+  return expr ? { expr, start: valueStart, end: docText.length } : null
+}
+
+function getHoverTokenInfo(
+  docText: string,
+  lineText: string,
+  lineFrom: number,
+  pos: number,
+): HoverTokenInfo | null {
+  const col = pos - lineFrom
+  const identChar = /[$a-zA-Z0-9_]/
+  let anchor = col
+  if (anchor > 0 && lineText[anchor] === ".") anchor--
+  if (anchor < lineText.length - 1 && lineText[anchor] === ".") anchor++
+  if (anchor < 0 || anchor >= lineText.length) return null
+
+  let wordLineStart = anchor
+  while (wordLineStart > 0 && identChar.test(lineText[wordLineStart - 1])) wordLineStart--
+  let wordLineEnd = anchor
+  while (wordLineEnd < lineText.length && identChar.test(lineText[wordLineEnd])) wordLineEnd++
+  if (wordLineStart === wordLineEnd) return null
+
+  const word = lineText.slice(wordLineStart, wordLineEnd)
+  if (!word || !/^[$a-zA-Z_]/.test(word)) return null
+
+  let tokenLineStart = wordLineStart
+  while (tokenLineStart > 0) {
+    const dotIdx = tokenLineStart - 1
+    if (lineText[dotIdx] !== ".") break
+    let segStart = dotIdx
+    while (segStart > 0 && identChar.test(lineText[segStart - 1])) segStart--
+    if (segStart === dotIdx) break
+    tokenLineStart = segStart
+  }
+
+  let tokenStart = lineFrom + tokenLineStart
+  let tokenEnd = lineFrom + wordLineEnd
+
+  // If followed by '(', include the full call. This covers both $fn(...) and path.fn(...).
+  if (docText[tokenEnd] === "(") {
+    const close = findMatchingParen(docText, tokenEnd)
+    if (close !== -1) tokenEnd = close
+  }
+  const wordStart = lineFrom + wordLineStart
+  const wordEnd = lineFrom + wordLineEnd
+
+  return {
+    token: docText.slice(tokenStart, tokenEnd),
+    tokenStart,
+    tokenEnd,
+    word,
+    wordStart,
+    wordEnd,
+  }
+}
+
 export function createJsonataHover(
   getEntries: () => CustomFunctionEntry[],
+  getHoverContext?: () => HoverContext | null,
 ): Extension {
   return hoverTooltip(
     (view, pos) => {
-      const line = view.state.doc.lineAt(pos);
-      const text = line.text;
-      const col = pos - line.from;
-      let s = col;
-      while (s > 0 && /[$a-zA-Z0-9_]/.test(text[s - 1])) s--;
-      let e = col;
-      while (e < text.length && /[a-zA-Z0-9_]/.test(text[e])) e++;
-      const word = text.slice(s, e);
-      if (!word.startsWith("$")) return null;
-      const fn = getFunctionOptions(getEntries).find((f) => f.label === word);
-      if (!fn) return null;
-      return {
-        pos: line.from + s,
-        end: line.from + e,
-        above: true,
-        create() {
-          const dom = document.createElement("div");
-          dom.className = "cm-fn-tooltip";
-          dom.innerHTML = `<div class="cm-fn-tt-sig">${esc(fn.label + fn.sig)}</div><div class="cm-fn-tt-info">${esc(fn.info)}</div>`;
-          return { dom };
-        },
-      };
+      const line = view.state.doc.lineAt(pos)
+      const docText = view.state.doc.toString()
+      const tokenInfo = getHoverTokenInfo(docText, line.text, line.from, pos)
+      if (!tokenInfo) return null
+
+      const { token, tokenStart, tokenEnd, word, wordStart, wordEnd } = tokenInfo
+      const fnLabel = (token.match(/^\$[A-Za-z_][A-Za-z0-9_]*/) ?? [word])[0]
+      const wordSpan = { pos: wordStart, end: wordEnd, above: true }
+      const fullSpan = { pos: tokenStart, end: tokenEnd, above: true }
+
+      const ctx = getHoverContext?.()
+
+      // No context — fall back to function signature only
+      if (!ctx) {
+        const fn = getFunctionOptions(getEntries).find(f => f.label === fnLabel)
+        return fn ? makeFnTooltip(fn, wordSpan) : null
+      }
+
+      // Evaluate the full token (including args if present) in real time
+      return (async () => {
+        try {
+          const keyValueExpr = findObjectValueExpression(docText, wordStart, wordEnd)
+          const targetExpr = keyValueExpr?.expr ?? token
+          const targetStart = keyValueExpr?.start ?? tokenStart
+          const targetEnd = keyValueExpr?.end ?? tokenEnd
+          const hoverExpr = buildScopedExpression(docText, targetExpr, targetStart)
+          const expr = jsonata(hoverExpr)
+          registerCustomFunctions(
+            expr as Parameters<typeof registerCustomFunctions>[0],
+            ctx.customFns,
+          )
+          const value = await expr.evaluate(ctx.inputData as object, ctx.bindingValues)
+          // Bare function reference — show signature instead
+          if (value === undefined || typeof value === 'function') {
+            const fn = getFunctionOptions(getEntries).find(f => f.label === fnLabel)
+            return fn ? makeFnTooltip(fn, wordSpan) : null
+          }
+          const labelSource = keyValueExpr ? `${word}: ${targetExpr}` : targetExpr
+          const label = labelSource.length > 60 ? labelSource.slice(0, 57) + '…' : labelSource
+          const span = keyValueExpr ? { pos: wordStart, end: wordEnd, above: true } : fullSpan
+          return makeValueTooltip(label, value, span)
+        } catch {
+          const fn = getFunctionOptions(getEntries).find(f => f.label === fnLabel)
+          return fn ? makeFnTooltip(fn, wordSpan) : null
+        }
+      })()
     },
-    { hideOnChange: true },
-  );
+    { hideOnChange: true, hoverTime: 100 },
+  )
 }
 
 // ── JS AUTOCOMPLETE ──────────────────────────────────────────────
@@ -784,6 +996,7 @@ export interface EditorExtensionOptions {
   getCustomFunctionEntries?: () => CustomFunctionEntry[];
   getBindingVars?: () => string[];
   getInputKeys?: () => string[];
+  getHoverContext?: () => HoverContext | null;
 }
 
 export function buildEditorExtensions(
@@ -799,6 +1012,7 @@ export function buildEditorExtensions(
     getCustomFunctionEntries,
     getBindingVars,
     getInputKeys,
+    getHoverContext,
   } = opts;
   const extensions: Extension[] = [...basicSetup];
 
@@ -816,7 +1030,7 @@ export function buildEditorExtensions(
     const getEntries = getCustomFunctionEntries ?? (() => []);
     extensions.push(
       createJsonataCompletion(getEntries, getBindingVars, getInputKeys),
-      createJsonataHover(getEntries),
+      createJsonataHover(getEntries, getHoverContext),
     );
   }
 

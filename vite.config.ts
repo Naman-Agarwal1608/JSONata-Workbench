@@ -26,8 +26,21 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/@codemirror') || id.includes('node_modules/@lezer')) {
-            return 'codemirror'
+          if (id.includes('node_modules/@codemirror/view') || id.includes('node_modules/@codemirror/state')) {
+            return 'codemirror-core'
+          }
+          if (
+            id.includes('node_modules/@codemirror/autocomplete') ||
+            id.includes('node_modules/@codemirror/commands') ||
+            id.includes('node_modules/@codemirror/language') ||
+            id.includes('node_modules/@codemirror/search') ||
+            id.includes('node_modules/@codemirror/lint') ||
+            id.includes('node_modules/@codemirror/lang-json') ||
+            id.includes('node_modules/@codemirror/lang-javascript') ||
+            id.includes('node_modules/@codemirror/theme-one-dark') ||
+            id.includes('node_modules/@lezer')
+          ) {
+            return 'codemirror-lang'
           }
           if (id.includes('node_modules/jsonata') || id.includes('node_modules/@jsonhero/codemirror-lang-jsonata')) {
             return 'jsonata-runtime'

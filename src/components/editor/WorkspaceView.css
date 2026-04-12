@@ -181,3 +181,12 @@
 .sbar .err {
   color: var(--err);
 }
+
+.selection-tooltip {
+  width: min(440px, calc(100vw - 24px));
+}
+
+.selection-tooltip .cm-fn-tt-editorHost {
+  max-height: 260px;
+  min-height: 0;
+}

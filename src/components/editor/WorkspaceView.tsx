@@ -9,8 +9,9 @@ import { useExecution } from '../../hooks/useExecution'
 import { useResizablePanels } from '../../hooks/useResizablePanels'
 import { breadcrumb, findNode } from '../../lib/workspace'
 import { parseCustomFunctions } from '../../lib/customFunctions'
-import type { EditorView } from '../../lib/codemirror'
-import { extractJsonKeys } from '../../lib/codemirror'
+import type { EditorView, HoverContext } from '../../lib/codemirror'
+import { extractJsonKeys, getValueViewerConfig, parseExecutionData } from '../../lib/helpers'
+import { buildExecutionEnvironment } from '../../lib/execution'
 
 export function WorkspaceView() {
   const { db } = useWorkspaceState()
@@ -38,12 +39,44 @@ export function WorkspaceView() {
     onOpenInspectValue: actions.openValueInspector,
   })
   const {
-    outputText, outputState, runStatus,
+    outputText, outputState, outputMode, runStatus,
     execCtx, execCtxExpanded, execCtxTab, inspectEntries,
-    run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue,
+    run, scheduleRun, toggleExecCtx, setExecCtxTab, openInspectValue, evaluateSelection,
   } = execution
 
   const [jsonErr, setJsonErr] = useState('')
+  const [selectionTooltip, setSelectionTooltip] = useState<{
+    label: string
+    value: unknown
+    top: number
+    left: number
+  } | null>(null)
+  const selectionHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const selectionCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const selectionTooltipHoverRef = useRef(false)
+  const selectionTooltipPinnedRef = useRef(false)
+
+  const clearSelectionHoverTimer = useCallback(() => {
+    if (selectionHoverTimerRef.current) {
+      clearTimeout(selectionHoverTimerRef.current)
+      selectionHoverTimerRef.current = null
+    }
+  }, [])
+
+  const clearSelectionCloseTimer = useCallback(() => {
+    if (selectionCloseTimerRef.current) {
+      clearTimeout(selectionCloseTimerRef.current)
+      selectionCloseTimerRef.current = null
+    }
+  }, [])
+
+  const closeSelectionTooltip = useCallback(() => {
+    clearSelectionHoverTimer()
+    clearSelectionCloseTimer()
+    selectionTooltipPinnedRef.current = false
+    selectionTooltipHoverRef.current = false
+    setSelectionTooltip(null)
+  }, [clearSelectionCloseTimer, clearSelectionHoverTimer])
 
   const getCustomFunctionEntries = useCallback(() => {
     const result = parseCustomFunctions(db.settings.customFunctions || '')
@@ -60,12 +93,36 @@ export function WorkspaceView() {
   }, [db.settings.bindings])
 
   const getInputKeys = useCallback(() => {
-    const raw = (inputEditorRef.current?.state.doc.toString().trim() || db.settings.globalContext || '').trim()
-    if (!raw) return []
-    try { return extractJsonKeys(JSON.parse(raw)) } catch { return [] }
+    const rawInput = inputEditorRef.current?.state.doc.toString().trim() || ''
+    const rawGlobal = db.settings.globalContext || ''
+    const dataResult = parseExecutionData(rawInput, rawGlobal)
+    if (!dataResult.ok) return []
+    return extractJsonKeys(dataResult.value)
   // inputEditorRef is a live ref — no dep needed for it
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db.settings.globalContext])
+
+  // Live refs so hover always sees the latest values without remounting the editor
+  const bindingsRawRef = useRef(db.settings.bindings)
+  bindingsRawRef.current = db.settings.bindings
+  const globalContextRef = useRef(db.settings.globalContext)
+  globalContextRef.current = db.settings.globalContext
+  const customFnsRawRef = useRef(db.settings.customFunctions)
+  customFnsRawRef.current = db.settings.customFunctions
+  const getHoverContext = useCallback((): HoverContext | null => {
+    const envResult = buildExecutionEnvironment(
+      inputEditorRef.current?.state.doc.toString() ?? '',
+      globalContextRef.current || '',
+      bindingsRawRef.current || '',
+      customFnsRawRef.current || '',
+    )
+    if (!envResult.ok) return null
+    return {
+      inputData: envResult.value.data,
+      bindingValues: envResult.value.bindings,
+      customFns: envResult.value.customFns,
+    }
+  }, [])
 
   function handleInputUpdate(val: string) {
     actions.updateNodeField(activeId!, 'input', val)
@@ -145,12 +202,120 @@ export function WorkspaceView() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [run])
 
+  useEffect(() => {
+    if (!selectionTooltip) return
+    function closeOnPointerDown(e: MouseEvent) {
+      const target = e.target as HTMLElement | null
+      if (target?.closest('.selection-tooltip')) return
+      closeSelectionTooltip()
+    }
+    function closeOnEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeSelectionTooltip()
+    }
+    document.addEventListener('mousedown', closeOnPointerDown)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnPointerDown)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [closeSelectionTooltip, selectionTooltip])
+
+  async function showSelectionTooltip() {
+    const exprView = exprEditorRef.current
+    if (!exprView) return
+    const mainSel = exprView.state.selection.main
+    if (mainSel.empty) {
+      closeSelectionTooltip()
+      return
+    }
+    try {
+      const result = await evaluateSelection()
+      if (!result) {
+        closeSelectionTooltip()
+        return
+      }
+      const coords = exprView.coordsAtPos(result.to) ?? exprView.coordsAtPos(result.from)
+      if (!coords) return
+      setSelectionTooltip({
+        label: result.label,
+        value: result.value,
+        top: coords.bottom + 8,
+        left: Math.min(coords.left, window.innerWidth - 460),
+      })
+    } catch (error) {
+      const selected = exprView.state.sliceDoc(mainSel.from, mainSel.to).trim()
+      const coords = exprView.coordsAtPos(mainSel.to) ?? exprView.coordsAtPos(mainSel.from)
+      if (!coords) return
+      setSelectionTooltip({
+        label: selected || 'Selection',
+        value: error,
+        top: coords.bottom + 8,
+        left: Math.min(coords.left, window.innerWidth - 460),
+      })
+    }
+  }
+
+  useEffect(() => {
+    const exprView = exprEditorRef.current
+    if (!exprView) return
+
+    function scheduleCloseSelectionTooltip() {
+      if (selectionTooltipPinnedRef.current) return
+      clearSelectionCloseTimer()
+      selectionCloseTimerRef.current = setTimeout(() => {
+        if (!selectionTooltipHoverRef.current && !selectionTooltipPinnedRef.current) closeSelectionTooltip()
+      }, 220)
+    }
+
+    function onMouseMove(e: MouseEvent) {
+      const view = exprEditorRef.current
+      if (!view) return
+      if (!selectionTooltipHoverRef.current && !selectionTooltipPinnedRef.current) clearSelectionCloseTimer()
+      const mainSel = view.state.selection.main
+      if (mainSel.empty) {
+        closeSelectionTooltip()
+        return
+      }
+      const pos = view.posAtCoords({ x: e.clientX, y: e.clientY })
+      if (pos == null || pos < mainSel.from || pos > mainSel.to) {
+        if (!selectionTooltipHoverRef.current && !selectionTooltipPinnedRef.current) scheduleCloseSelectionTooltip()
+        return
+      }
+      clearSelectionHoverTimer()
+      selectionHoverTimerRef.current = setTimeout(() => {
+        void showSelectionTooltip()
+      }, 180)
+    }
+
+    function onMouseLeave(e: MouseEvent) {
+      const related = e.relatedTarget as HTMLElement | null
+      if (related?.closest('.selection-tooltip')) return
+      scheduleCloseSelectionTooltip()
+    }
+
+    function onMouseDown() {
+      closeSelectionTooltip()
+    }
+
+    exprView.dom.addEventListener('mousemove', onMouseMove)
+    exprView.dom.addEventListener('mouseleave', onMouseLeave)
+    exprView.dom.addEventListener('mousedown', onMouseDown)
+    return () => {
+      clearSelectionHoverTimer()
+      clearSelectionCloseTimer()
+      exprView.dom.removeEventListener('mousemove', onMouseMove)
+      exprView.dom.removeEventListener('mouseleave', onMouseLeave)
+      exprView.dom.removeEventListener('mousedown', onMouseDown)
+    }
+  }, [clearSelectionCloseTimer, clearSelectionHoverTimer, closeSelectionTooltip, evaluateSelection])
+
   const badgeClass = runStatus.kind !== 'idle' ? runStatus.kind : ''
   const badgeText = runStatus.kind !== 'idle' ? runStatus.text : ''
   const statusText = runStatus.kind !== 'idle' ? runStatus.text : 'Ready'
   const durationText = runStatus.kind !== 'idle' && typeof runStatus.durationMs === 'number'
     ? `${runStatus.durationMs} ms`
     : ''
+  const selectionViewer = selectionTooltip ? getValueViewerConfig(selectionTooltip.value) : null
 
   return (
     <>
@@ -222,6 +387,7 @@ export function WorkspaceView() {
                   getCustomFunctionEntries={getCustomFunctionEntries}
                   getBindingVars={getBindingVars}
                   getInputKeys={getInputKeys}
+                  getHoverContext={getHoverContext}
                   onUpdate={handleExprUpdate}
                 />
               </div>
@@ -248,7 +414,7 @@ export function WorkspaceView() {
                 <CodeMirrorEditor
                   key={`out-${activeId}-${theme}-${outputText.slice(0, 20)}`}
                   initialValue={outputText}
-                  mode="json"
+                  mode={outputMode}
                   readOnly
                   withErrorMarkers
                   theme={theme}
@@ -279,6 +445,38 @@ export function WorkspaceView() {
           {durationText && <span>{durationText}</span>}
         </div>
       </div>
+      {selectionTooltip && (
+        <div
+          className="selection-tooltip cm-tooltip cm-tooltip-hover"
+          style={{ position: 'fixed', top: selectionTooltip.top, left: selectionTooltip.left, zIndex: 60 }}
+          onMouseEnter={() => {
+            selectionTooltipHoverRef.current = true
+            selectionTooltipPinnedRef.current = true
+            if (selectionCloseTimerRef.current) {
+              clearTimeout(selectionCloseTimerRef.current)
+              selectionCloseTimerRef.current = null
+            }
+          }}
+          onMouseLeave={() => {
+            selectionTooltipHoverRef.current = false
+          }}
+        >
+          <div className="cm-fn-tooltip">
+            <div className="cm-fn-tt-sig">{selectionTooltip.label}</div>
+            <div className="cm-fn-tt-editorHost">
+              {selectionViewer && (
+                <CodeMirrorEditor
+                  key={`selection-tooltip-${theme}-${selectionTooltip.label}-${selectionViewer.mode}-${selectionViewer.doc.slice(0, 80)}`}
+                  initialValue={selectionViewer.doc}
+                  mode={selectionViewer.mode}
+                  readOnly
+                  theme={theme}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

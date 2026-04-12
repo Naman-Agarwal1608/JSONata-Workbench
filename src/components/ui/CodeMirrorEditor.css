@@ -1,5 +1,13 @@
 /* CodeMirror 6 container and all editor overrides */
 
+.cm-editorHost,
+.cm-editorMount {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .cm-wrap {
   flex: 1;
   overflow: hidden;
@@ -41,6 +49,18 @@
   color: var(--tx3);
   font-style: italic;
   font-family: var(--ui);
+}
+
+.cm-loadError {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  font-size: 11px;
+  color: var(--err);
+  font-family: var(--ui);
+  text-align: center;
 }
 
 /* Gutters */
@@ -193,9 +213,14 @@
   padding: 0 !important;
 }
 
+.cm-tooltip.cm-tooltip-hover {
+  pointer-events: auto !important;
+}
+
 .cm-fn-tooltip {
   padding: 8px 12px;
-  max-width: 340px;
+  max-width: 420px;
+  min-width: 0;
 }
 
 .cm-fn-tt-sig {
@@ -203,11 +228,50 @@
   font-size: 11.5px;
   color: var(--acc);
   margin-bottom: 4px;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  max-width: 100%;
 }
 
 .cm-fn-tt-info {
   font-size: 11px;
   color: var(--tx2);
   line-height: 1.55;
+}
+
+.cm-fn-tt-src {
+  font-family: var(--sans, sans-serif);
+  font-size: 10px;
+  color: var(--tx3);
+  font-weight: normal;
+  margin-left: 6px;
+}
+
+.cm-fn-tt-editorHost {
+  margin: 6px 0 0;
+  background: rgba(0,0,0,.18);
+  border-radius: 5px;
+  max-height: 260px;
+  overflow: hidden;
+  min-height: 40px;
+}
+
+.cm-fn-tt-editorHost .cm-wrap,
+.cm-fn-tt-editorHost .cm-editor,
+.cm-fn-tt-editorHost .cm-scroller {
+  min-height: 0;
+  max-height: 260px;
+}
+
+.cm-fn-tt-editorHost .cm-wrap {
+  height: auto;
+}
+
+.cm-fn-tt-editorHost .cm-editor {
+  height: auto;
+}
+
+.cm-fn-tt-editorHost .cm-scroller {
+  height: auto !important;
 }

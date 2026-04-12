@@ -31,6 +31,65 @@ export function parseJSONText(
   }
 }
 
+export function parseExecutionData(rawInput: string, rawGlobal: string): ParseResult<unknown> {
+  const input = rawInput.trim()
+  const global = rawGlobal.trim()
+  if (!input && !global) return { ok: true, value: {} }
+  if (input) {
+    try { return { ok: true, value: JSON.parse(input) } } catch { /* fall back to global */ }
+  }
+  if (global) {
+    try { return { ok: true, value: JSON.parse(global) } } catch (e) {
+      const msg = e instanceof Error ? e.message.split('\n')[0] : String(e)
+      return { ok: false, message: `Global context error:\n${msg}` }
+    }
+  }
+  try { return { ok: true, value: JSON.parse(input) } } catch (e) {
+    const msg = e instanceof Error ? e.message.split('\n')[0] : String(e)
+    return { ok: false, message: `JSON input error:\n${msg}` }
+  }
+}
+
+export function getValueViewerConfig(value: unknown): { doc: string; mode: 'json' | 'plain' } {
+  if (value === undefined) return { doc: '(undefined)', mode: 'plain' }
+  if (typeof value === 'string') return { doc: value, mode: 'plain' }
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return { doc: JSON.stringify(value, null, 2), mode: 'json' }
+  }
+  if (typeof value === 'bigint' || typeof value === 'symbol' || typeof value === 'function') {
+    return { doc: String(value), mode: 'plain' }
+  }
+  if (value instanceof Error) {
+    return { doc: value.stack || value.message || String(value), mode: 'plain' }
+  }
+
+  try {
+    const seen = new WeakSet<object>()
+    const doc = JSON.stringify(value, (_key, currentValue) => {
+      if (typeof currentValue === 'bigint') return currentValue.toString()
+      if (typeof currentValue === 'symbol') return String(currentValue)
+      if (typeof currentValue === 'function') return `[Function ${currentValue.name || 'anonymous'}]`
+      if (currentValue instanceof Error) {
+        return {
+          name: currentValue.name,
+          message: currentValue.message,
+          stack: currentValue.stack,
+        }
+      }
+      if (currentValue && typeof currentValue === 'object') {
+        if (seen.has(currentValue as object)) return '[Circular]'
+        seen.add(currentValue as object)
+      }
+      return currentValue
+    }, 2)
+    if (typeof doc === 'string') return { doc, mode: 'json' }
+  } catch {
+    // fall through
+  }
+
+  return { doc: String(value), mode: 'plain' }
+}
+
 export function getLineInfoFromOffset(text: string, offset: number): ErrorLocation & { offset: number } {
   const safe = Math.max(0, Math.min(text.length, offset ?? 0))
   let line = 1
@@ -90,6 +149,18 @@ export function summariseValue(value: unknown): string {
     return `Object(${keys.length} keys){${keys.slice(0, 4).join(', ')}${keys.length > 4 ? ', …' : ''}}`
   }
   return JSON.stringify(value)
+}
+
+export function extractJsonKeys(val: unknown): string[] {
+  if (!val || typeof val !== 'object') return []
+  if (Array.isArray(val)) {
+    const first = val[0]
+    if (first && typeof first === 'object' && !Array.isArray(first)) {
+      return Object.keys(first as Record<string, unknown>)
+    }
+    return []
+  }
+  return Object.keys(val as Record<string, unknown>)
 }
 
 export function getExpressionSnippet(expr: string, loc: ErrorLocation): string {
@@ -171,4 +242,20 @@ export function splitTopLevelStatements(expr: string): StatementInfo[] {
     out.push({ text: tail.trim(), startOffset, endOffset, startLine: getLineInfoFromOffset(expr, startOffset).line, endLine: getLineInfoFromOffset(expr, endOffset).line })
   }
   return out
+}
+
+export function buildScopedExpression(expr: string, targetExpr: string, offset: number): string {
+  const statements = splitTopLevelStatements(expr)
+  const currentStmt = statements.find(stmt => stmt.startOffset <= offset && offset <= stmt.endOffset)
+  const prefixStatements = statements
+    .filter(stmt => {
+      if (stmt.endOffset <= offset) return true
+      if (stmt !== currentStmt) return false
+      const assignMatch = stmt.text.match(/^\s*(\$[A-Za-z_][A-Za-z0-9_]*)\s*:=/)
+      return assignMatch?.[1] === targetExpr
+    })
+    .map(stmt => stmt.text)
+
+  if (!prefixStatements.length) return targetExpr
+  return `(\n${prefixStatements.join(';\n')};\n${targetExpr}\n)`
 }
